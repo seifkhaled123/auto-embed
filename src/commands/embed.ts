@@ -1,5 +1,28 @@
+import path from "node:path";
 import { Command } from "commander";
-import { log } from "../log.js";
+import { chunkDocument } from "../chunker/index.js";
+import { countTokensSync, primeTokenizer } from "../chunker/tokens.js";
+import {
+  DEFAULT_MODELS,
+  EmbeddingProviderName,
+  loadConfig,
+} from "../config/index.js";
+import { AutoEmbedError, ExitCode } from "../errors.js";
+import { log, pc } from "../log.js";
+import { parseFile } from "../parsers/index.js";
+import { heuristicPlan } from "../plan/heuristic.js";
+import { EmbedPlan, hashPlan, SplitterName } from "../plan/schema.js";
+
+interface EmbedOpts {
+  collection?: string;
+  provider?: EmbeddingProviderName;
+  model?: string;
+  splitter?: SplitterName;
+  chunkSize?: number;
+  overlap?: number;
+  metadata?: string;
+  dryRun?: boolean;
+}
 
 export function buildEmbedCommand(): Command {
   return new Command("embed")
@@ -22,7 +45,126 @@ export function buildEmbedCommand(): Command {
     .option("--dry-run", "show what would happen; embed nothing")
     .option("--out-vectors <path>", "also write vectors to a local .jsonl")
     .option("-y, --yes", "non-interactive mode")
-    .action(async () => {
-      log.info("embed: not yet implemented (M3+)");
+    .action(async (files: string[], opts: EmbedOpts) => {
+      if (!opts.dryRun) {
+        log.info(pc.dim("embed: full pipeline lands in M4. Use --dry-run for now."));
+        return;
+      }
+      for (const file of files) {
+        await runDryRun(file, opts);
+      }
     });
+}
+
+async function runDryRun(file: string, opts: EmbedOpts): Promise<void> {
+  const cfg = await loadConfig();
+  const provider = opts.provider ?? cfg.defaults?.provider ?? "openai";
+  const model =
+    opts.model ??
+    cfg.defaults?.model ??
+    cfg.models?.[provider] ??
+    DEFAULT_MODELS[provider];
+
+  const plan: EmbedPlan = heuristicPlan({
+    sourcePath: file,
+    embeddingModel: model,
+    overrides: {
+      splitter: opts.splitter,
+      chunkSize: opts.chunkSize,
+      overlap: opts.overlap,
+      collection: opts.collection,
+      metadata: opts.metadata ? parseMetadata(opts.metadata) : undefined,
+    },
+  });
+
+  const document = await parseFile(file);
+  await primeTokenizer();
+  const chunks = await chunkDocument(document, plan);
+
+  printPlan(file, plan);
+  printChunks(chunks);
+}
+
+function printPlan(file: string, plan: EmbedPlan): void {
+  const lines = [
+    `plan for ${pc.bold(path.basename(file))} (heuristic):`,
+    `  splitter:        ${plan.splitter}`,
+    `  chunkSize:       ${plan.chunkSize} tokens`,
+    `  overlap:         ${plan.overlap} tokens`,
+    `  collection:      ${plan.collection}`,
+    `  embeddingModel:  ${plan.embeddingModel}`,
+    `  planHash:        ${hashPlan(plan)}`,
+  ];
+  for (const line of lines) process.stdout.write(line + "\n");
+  process.stdout.write("\n");
+}
+
+function printChunks(chunks: { id: string; text: string; meta: Record<string, unknown> }[]): void {
+  process.stdout.write(`${chunks.length} chunk${chunks.length === 1 ? "" : "s"} would be embedded:\n`);
+  process.stdout.write("\n");
+  const header = ["#", "ID", "TOKENS", "META"];
+  const rows = chunks.map((c, i) => [
+    String(i),
+    c.id,
+    String(countTokensSync(c.text)),
+    formatMeta(c.meta),
+  ]);
+  const widths = header.map((h, i) =>
+    Math.max(h.length, ...rows.map((r) => r[i]!.length)),
+  );
+  const fmt = (cells: string[]) =>
+    cells.map((c, i) => c.padEnd(widths[i]!)).join("  ");
+  process.stdout.write(pc.dim(fmt(header)) + "\n");
+  for (const row of rows) process.stdout.write(fmt(row) + "\n");
+}
+
+const META_PRIORITY = [
+  "headerPath",
+  "pageNumber",
+  "pageCount",
+  "row",
+  "line",
+  "keyPath",
+  "language",
+  "heading",
+  "sectionIndex",
+  "chunkInSection",
+  "chunkIndex",
+];
+
+const META_SKIP = new Set(["sourcePath", "contentType", "columns"]);
+
+function formatMeta(meta: Record<string, unknown>): string {
+  const parts: string[] = [];
+  for (const key of META_PRIORITY) {
+    if (key in meta) parts.push(formatPair(key, meta[key]));
+  }
+  for (const key of Object.keys(meta).sort()) {
+    if (META_SKIP.has(key)) continue;
+    if (META_PRIORITY.includes(key)) continue;
+    parts.push(formatPair(key, meta[key]));
+  }
+  return parts.join(" ");
+}
+
+function formatPair(key: string, value: unknown): string {
+  if (Array.isArray(value)) return `${key}=[${value.join("/")}]`;
+  if (value && typeof value === "object") return `${key}=${JSON.stringify(value)}`;
+  return `${key}=${value}`;
+}
+
+function parseMetadata(raw: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const pair of raw.split(",")) {
+    const eq = pair.indexOf("=");
+    if (eq === -1) {
+      throw new AutoEmbedError(
+        `Invalid --metadata entry: "${pair}"`,
+        ExitCode.UserConfig,
+        "Use --metadata key=value,key2=value2",
+      );
+    }
+    out[pair.slice(0, eq).trim()] = pair.slice(eq + 1).trim();
+  }
+  return out;
 }
