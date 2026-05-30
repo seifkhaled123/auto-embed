@@ -1,0 +1,11 @@
+id,name,role,department,start_year,active
+1,Ada Lovelace,Principal Engineer,Compilers,2014,true
+2,Alan Turing,Distinguished Engineer,Machine Learning,2012,true
+3,Grace Hopper,Engineering Director,Languages,2010,true
+4,Edsger Dijkstra,Senior Researcher,Systems,2018,false
+5,Donald Knuth,Senior Researcher,Algorithms,2008,true
+6,Barbara Liskov,Engineering Director,Distributed Systems,2011,true
+7,John McCarthy,Principal Engineer,Languages,2013,false
+8,Marvin Minsky,Senior Researcher,Machine Learning,2015,true
+9,Tony Hoare,Distinguished Engineer,Algorithms,2009,true
+10,Niklaus Wirth,Engineering Director,Languages,2017,false

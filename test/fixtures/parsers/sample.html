@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sample Article</title>
+    <style>body { font-family: sans-serif; }</style>
+    <script>console.log("this should not be in the output");</script>
+  </head>
+  <body>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/about">About</a>
+      <a href="/contact">Contact</a>
+    </nav>
+    <main>
+      <article>
+        <h1>The Cost of Premature Abstraction</h1>
+        <p>
+          Abstractions feel productive. They feel like progress. But every abstraction is also a
+          bet on the future shape of the problem — and most of those bets are wrong.
+        </p>
+        <section>
+          <h2>The three-instance rule</h2>
+          <p>
+            Wait until you have three concrete instances of the same pattern before reaching for an
+            abstraction. With two instances, your generalization is almost certainly wrong.
+          </p>
+        </section>
+        <section>
+          <h2>Inlined repetition is cheap</h2>
+          <p>
+            Three nearly-identical lines of code are easier to read, change, and delete than one
+            cleverly parameterized helper. The helper hides the differences; the lines surface them.
+          </p>
+        </section>
+      </article>
+    </main>
+    <aside>
+      <p>Related: Five rules for working with legacy code.</p>
+    </aside>
+    <footer>
+      <p>Copyright placeholder. This footer should be stripped from the parse.</p>
+    </footer>
+  </body>
+</html>

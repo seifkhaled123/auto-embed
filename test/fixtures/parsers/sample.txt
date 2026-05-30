@@ -1,0 +1,17 @@
+The quiet observation is the most underrated skill in software engineering. Engineers who slow down to watch what is actually happening — to read the error message twice, to print the value, to step through the loop — make better decisions than engineers who pattern-match from past projects.
+
+Most production bugs are not exotic. They are old, familiar mistakes wearing slightly different clothes. The null reference appears in a new module. The race condition lives between two systems written by different teams a year apart. The off-by-one error shows up after a refactor renames the loop variable.
+
+The discipline of looking, then thinking, then acting compounds. It is unglamorous. It does not show up on dashboards. But it is what separates engineers who reliably ship working software from those who reliably ship plausible-looking software that breaks in production.
+
+A good rule of thumb: if a bug seems strange, you do not yet understand the system. Strangeness is the system telling you that your mental model is wrong. The fix is rarely the patch you first think of; it is usually closer to the assumption you forgot you were making.
+
+When in doubt, write the smaller program. When in more doubt, read the existing one. The codebase is the most honest documentation. It is also the most current. Comments lie, READMEs go stale, but the source code is what actually runs.
+
+Most engineers underestimate how much can be learned by sitting with a problem for fifteen quiet minutes before touching the keyboard. Tools are powerful, but no tool can substitute for the act of understanding what you are trying to do. The keyboard is a means of expression, not a means of thought.
+
+Read code as if it might surprise you. Write code as if someone will. Test code as if production is one bad commit away. And when you are stuck, ask a question — but ask it well, with what you tried, what you expected, and what you saw instead.
+
+The best engineers I have worked with share two traits: a relentless focus on the user, and a refusal to mistake activity for progress. They are willing to sit still. They are willing to delete code. They are willing to be wrong out loud, fix the misunderstanding, and move on without ego.
+
+This is a practice, not a personality. It can be learned. It begins with the smallest possible loop: see, think, act, observe. Repeat until the system behaves the way you predicted it would.

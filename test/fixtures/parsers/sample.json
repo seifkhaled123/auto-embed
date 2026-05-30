@@ -1,0 +1,37 @@
+[
+  {
+    "id": "INC-001",
+    "title": "Elevated 5xx rate on checkout API",
+    "severity": "sev2",
+    "tags": ["api", "checkout", "regression"],
+    "summary": "A deploy at 14:02 UTC introduced a null pointer in the discount-code path."
+  },
+  {
+    "id": "INC-002",
+    "title": "Read replica lag spike",
+    "severity": "sev3",
+    "tags": ["database", "replication"],
+    "summary": "Long-running migration on the primary caused 90s of replica lag."
+  },
+  {
+    "id": "INC-003",
+    "title": "Search index out of sync",
+    "severity": "sev2",
+    "tags": ["search", "indexer"],
+    "summary": "Kafka consumer offset reset triggered a full re-index that took 4 hours."
+  },
+  {
+    "id": "INC-004",
+    "title": "OAuth token refresh loop",
+    "severity": "sev3",
+    "tags": ["auth", "third-party"],
+    "summary": "Provider returned 401 instead of 403 for a revoked token; refresh loop retried indefinitely."
+  },
+  {
+    "id": "INC-005",
+    "title": "CDN cache poisoning",
+    "severity": "sev1",
+    "tags": ["cdn", "security"],
+    "summary": "A user-controlled query parameter was included in the cache key, allowing cross-tenant content leak."
+  }
+]
