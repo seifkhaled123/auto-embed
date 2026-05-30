@@ -1,0 +1,830 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>auto-embed — Implementation Plan</title>
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --surface: #ffffff;
+    --ink: #1a1a1a;
+    --muted: #6b6b6b;
+    --line: #e6e3dc;
+    --accent: #2b5d34;
+    --accent-soft: #e9f0e8;
+    --code-bg: #f4f1ea;
+    --code-ink: #2a2a2a;
+    --warn: #8a4a00;
+    --warn-soft: #fbeedb;
+    --crit: #8a1f1f;
+    --crit-soft: #f7e0e0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14140f;
+      --surface: #1c1c17;
+      --ink: #ece8df;
+      --muted: #9a9588;
+      --line: #2c2c25;
+      --accent: #8fbf95;
+      --accent-soft: #1f2a20;
+      --code-bg: #232320;
+      --code-ink: #ece8df;
+      --warn: #e7b87a;
+      --warn-soft: #2a2218;
+      --crit: #e89292;
+      --crit-soft: #2a1a1a;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  .wrap {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 64px 32px 96px;
+  }
+  header.hero {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 32px;
+    margin-bottom: 40px;
+  }
+  header.hero .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  header.hero h1 {
+    font-size: 40px;
+    line-height: 1.15;
+    margin: 0 0 8px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  header.hero .sub {
+    color: var(--muted);
+    font-size: 17px;
+  }
+  header.hero .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    margin-top: 20px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  header.hero .meta b { color: var(--ink); font-weight: 600; }
+  h2 {
+    font-size: 26px;
+    margin: 56px 0 18px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+  }
+  h3 {
+    font-size: 19px;
+    margin: 32px 0 10px;
+    font-weight: 650;
+  }
+  h4 {
+    font-size: 15px;
+    margin: 20px 0 8px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  p { margin: 0 0 14px; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color .15s; }
+  a:hover { border-bottom-color: var(--accent); }
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.92em;
+    background: var(--code-bg);
+    color: var(--code-ink);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    padding: 18px 20px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 13.5px;
+    line-height: 1.55;
+    border: 1px solid var(--line);
+    margin: 16px 0 22px;
+  }
+  pre code { background: transparent; padding: 0; font-size: inherit; }
+  ul, ol { margin: 0 0 18px; padding-left: 24px; }
+  li { margin: 4px 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 18px 0 26px;
+    font-size: 14.5px;
+  }
+  th, td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  th {
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    background: var(--surface);
+  }
+  tbody tr:hover { background: var(--surface); }
+  .milestone {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 24px 28px;
+    margin: 20px 0;
+  }
+  .milestone .tag {
+    display: inline-block;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 3px 10px;
+    border-radius: 999px;
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+  .milestone h3 { display: inline; margin: 0; font-size: 19px; vertical-align: middle; }
+  .milestone .duration {
+    color: var(--muted);
+    font-size: 13px;
+    margin-left: 10px;
+    vertical-align: middle;
+  }
+  .milestone .goal {
+    margin-top: 14px;
+    font-style: italic;
+    color: var(--muted);
+  }
+  .milestone .accept {
+    margin-top: 14px;
+  }
+  .milestone .accept-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 6px;
+  }
+  .ship {
+    background: var(--warn-soft);
+    color: var(--warn);
+    border: 1px dashed var(--warn);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 14px 0;
+    font-size: 14.5px;
+  }
+  .risk-row.crit td:nth-child(3) { color: var(--crit); font-weight: 600; }
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px 28px;
+    margin: 0 0 40px;
+  }
+  .toc h4 { margin-top: 0; }
+  .toc ol { margin: 0; padding-left: 20px; }
+  .toc li { margin: 2px 0; }
+  .toc a { color: var(--ink); }
+  .toc a:hover { color: var(--accent); }
+  .callout {
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin: 16px 0 22px;
+    font-size: 14.5px;
+  }
+  footer.foot {
+    margin-top: 80px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13px;
+    text-align: center;
+  }
+  hr { border: none; border-top: 1px solid var(--line); margin: 32px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">Implementation Plan</div>
+  <h1>auto-embed</h1>
+  <div class="sub">A zero-config CLI for ingesting files into vector databases. The build plan from scaffold to <code>npm publish</code>.</div>
+  <div class="meta">
+    <div><b>Target:</b> v1.0.0 on npm</div>
+    <div><b>Estimated build:</b> ~3 weeks (solo, focused)</div>
+    <div><b>Companion docs:</b> <a href="./PRD.md">PRD.md</a> · <a href="./CLAUDE.md">CLAUDE.md</a></div>
+  </div>
+</header>
+
+<div class="toc">
+  <h4>Contents</h4>
+  <ol>
+    <li><a href="#dirs">Directory layout</a></li>
+    <li><a href="#deps">Dependencies</a></li>
+    <li><a href="#arch">Architecture at a glance</a></li>
+    <li><a href="#contracts">Internal type contracts</a></li>
+    <li><a href="#schemas">Concrete zod schemas</a></li>
+    <li><a href="#chunker">Recursive chunker algorithm</a></li>
+    <li><a href="#errors">Error format</a></li>
+    <li><a href="#fixtures">Test fixtures</a></li>
+    <li><a href="#milestones">Milestones</a></li>
+    <li><a href="#critical-path">Critical-path dependency graph</a></li>
+    <li><a href="#testing">Test strategy</a></li>
+    <li><a href="#risks">Risk register</a></li>
+    <li><a href="#oos">Out of scope</a></li>
+    <li><a href="#dod">Definition of Done</a></li>
+  </ol>
+</div>
+
+<p>This plan is sequenced so each milestone produces a working, demoable slice. The tool becomes publishable from <b>M4</b> onward — every later milestone widens coverage rather than gating usability.</p>
+
+<h2 id="dirs">Directory layout</h2>
+<pre><code>auto-embed/
+├── src/
+│   ├── index.ts                    # CLI entry, commander setup, dispatch
+│   ├── commands/
+│   │   ├── init.ts                 # interactive setup
+│   │   ├── embed.ts                # main pipeline command
+│   │   ├── plan.ts                 # alias for `embed --plan-only`
+│   │   ├── config.ts               # get|set|list|path
+│   │   └── providers.ts            # list provider + key status
+│   ├── config/
+│   │   ├── index.ts                # load/save, env-var override
+│   │   ├── schema.ts               # zod config schema
+│   │   └── mask.ts                 # API key masking helpers
+│   ├── log.ts                      # single logger module — all output goes here
+│   ├── errors.ts                   # AutoEmbedError + ExitCode enum
+│   ├── parsers/
+│   │   ├── index.ts                # dispatch by extension + content sniff
+│   │   ├── text.ts                 # .txt
+│   │   ├── markdown.ts             # .md, .mdx (unified + remark)
+│   │   ├── pdf.ts                  # .pdf (unpdf)
+│   │   ├── html.ts                 # .html, .htm (cheerio)
+│   │   ├── docx.ts                 # .docx (mammoth → markdown)
+│   │   ├── csv.ts                  # .csv
+│   │   ├── json.ts                 # .json, .jsonl
+│   │   └── code.ts                 # .ts, .js, .py, .go, .rs, .java
+│   ├── chunker/
+│   │   ├── index.ts                # dispatch by EmbedPlan.splitter
+│   │   ├── recursive.ts            # token-aware recursive char splitter
+│   │   ├── markdown.ts             # header-aware splitter
+│   │   ├── code.ts                 # language-tuned separators
+│   │   └── tokens.ts               # js-tiktoken wrapper
+│   ├── plan/
+│   │   ├── schema.ts               # zod EmbedPlan schema
+│   │   ├── heuristic.ts            # extension → plan (no LLM)
+│   │   └── llm.ts                  # optional --plan (one LLM call)
+│   ├── providers/                  # embedding providers
+│   │   ├── index.ts                # registry, dispatch
+│   │   ├── types.ts                # EmbeddingProvider interface
+│   │   ├── openai.ts
+│   │   ├── google.ts
+│   │   ├── voyage.ts
+│   │   ├── cohere.ts
+│   │   └── fastembed.ts            # local, no API key
+│   ├── vector-dbs/
+│   │   ├── index.ts                # registry, dispatch
+│   │   ├── types.ts                # VectorDB interface
+│   │   ├── chroma.ts
+│   │   ├── pgvector.ts
+│   │   ├── pinecone.ts
+│   │   └── qdrant.ts
+│   ├── embed/
+│   │   ├── engine.ts               # batching, concurrency, retry
+│   │   └── pipeline.ts             # parse → chunk → embed → upsert orchestration
+│   └── lockfile.ts                 # .auto-embed.lock.json read/write/diff
+├── test/
+│   ├── fixtures/
+│   │   ├── parsers/                # one tiny sample per file type
+│   │   ├── plans/                  # golden EmbedPlan JSONs
+│   │   └── lockfiles/              # golden lockfile JSONs for diff tests
+│   ├── parsers.test.ts
+│   ├── chunker.test.ts
+│   ├── lockfile.test.ts
+│   ├── plan.test.ts
+│   ├── providers.test.ts           # HTTP-mocked
+│   └── cli.test.ts                 # spawns dist/index.js
+├── dist/                           # tsup output, gitignored
+├── PRD.md
+├── PLAN.md
+├── CLAUDE.md
+├── README.md
+├── package.json
+├── tsup.config.ts
+├── tsconfig.json
+└── vitest.config.ts</code></pre>
+
+<h2 id="deps">Dependencies</h2>
+<p>Pinned to the major versions verified at design time. When installing, use these majors; do not jump to a newer major without retesting.</p>
+
+<h4>Runtime (always loaded)</h4>
+<pre><code>commander          ^14
+@clack/prompts     ^1
+ora                ^9
+picocolors         ^1
+zod                ^3.25     # NOT v4 — stay aligned with auto-seed
+js-tiktoken        ^1
+p-limit            ^6
+p-retry            ^7</code></pre>
+
+<h4>Parsers (lazy-imported inside each parser module)</h4>
+<pre><code>unified              ^11
+remark-parse         ^11
+mdast-util-to-string ^4
+unpdf                ^1      # NOT pdf-parse
+cheerio              ^1
+mammoth              ^1</code></pre>
+
+<h4>Embedding providers (lazy-imported per provider)</h4>
+<pre><code>openai             ^6
+@google/genai      ^2
+cohere-ai          ^7
+voyageai           latest    # verify at install time
+fastembed          ^1</code></pre>
+
+<h4>Vector DBs (lazy-imported per adapter)</h4>
+<pre><code>chromadb                      ^1
+pg                            ^8
+@pinecone-database/pinecone   ^6
+@qdrant/js-client-rest        ^1</code></pre>
+
+<h4>Optional <code>--plan</code> LLM clients</h4>
+<pre><code>@anthropic-ai/sdk  ^0.98     # only loaded when --plan is passed</code></pre>
+<p>OpenAI and Google clients are reused from the embedding providers list.</p>
+
+<h4>Dev</h4>
+<pre><code>tsup               ^8
+tsx                ^4
+typescript         ^5.9
+vitest             ^4
+@types/node        ^25
+@types/pg          ^8
+madge              ^8        # circular-dep check in CI</code></pre>
+
+<div class="callout"><b>Lazy-import discipline:</b> parser, provider, and DB modules must <code>await import('…')</code> at use time, not at top-level. This keeps cold-start time under the 500 ms budget and prevents <code>--help</code> from loading <code>mammoth</code>.</div>
+
+<h2 id="arch">Architecture at a glance</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────┐
+│                            CLI (commander)                          │
+│  init │ embed │ plan │ config │ providers                           │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                ┌──────────────▼──────────────┐
+                │       Pipeline Orchestrator │
+                │  resolves: plan → execute   │
+                └──┬────────┬────────┬────────┘
+                   │        │        │
+        ┌──────────▼──┐ ┌───▼────┐ ┌─▼──────────┐
+        │   Parsers   │ │Chunker │ │  Lockfile  │
+        │ md/pdf/html │ │ token- │ │  manager   │
+        │ docx/csv/.. │ │ aware  │ │ (idempot.) │
+        └──────┬──────┘ └───┬────┘ └────────────┘
+               │            │
+               └─────┬──────┘
+                     │ Document[]
+                ┌────▼────────────┐
+                │  Embed Engine   │
+                │ batch · retry · │
+                │ rate-limit      │
+                └────┬────────────┘
+                     │ (id, vector, metadata)[]
+                ┌────▼────────────┐
+                │  VectorDB       │
+                │  Adapter        │
+                │ (pgvector,      │
+                │  pinecone,      │
+                │  qdrant,        │
+                │  chroma)        │
+                └─────────────────┘</code></pre>
+
+<h2 id="contracts">Internal type contracts</h2>
+<pre><code>type ParsedDocument = {
+  sourcePath: string;
+  contentType: 'markdown' | 'pdf' | 'html' | 'docx' | 'text' | 'json' | 'csv' | 'code';
+  sections: Array&lt;{ text: string; meta: Record&lt;string, unknown&gt; }&gt;;
+};
+
+type Chunk = {
+  id: string;              // sha256(sourcePath + index + chunkerVersion + text)[:16]
+  text: string;
+  meta: Record&lt;string, unknown&gt;;
+};
+
+type Embedded = Chunk &amp; { vector: number[]; model: string; dim: number };
+
+interface EmbeddingProvider {
+  name: string;
+  defaultModel: string;
+  embed(texts: string[], opts?: { model?: string }): Promise&lt;{ vectors: number[][]; usage: TokenUsage }&gt;;
+  dimensions(model: string): number;
+}
+
+interface VectorDB {
+  name: string;
+  ensureCollection(name: string, dim: number): Promise&lt;void&gt;;
+  describeCollection(name: string): Promise&lt;{ dim: number } | null&gt;;
+  upsert(collection: string, rows: Embedded[]): Promise&lt;void&gt;;
+  deleteByIds(collection: string, ids: string[]): Promise&lt;void&gt;;
+}
+
+type EmbedPlan = {
+  version: 1;
+  splitter: 'recursive' | 'markdown' | 'pdf' | 'html' | 'code' | 'jsonl' | 'csv';
+  chunkSize: number;
+  overlap: number;
+  metadata: Record&lt;string, string&gt;;
+  collection: string;
+  embeddingModel: string;
+};</code></pre>
+
+<h2 id="schemas">Concrete zod schemas</h2>
+<h4><code>src/plan/schema.ts</code></h4>
+<pre><code>export const EmbedPlanSchema = z.object({
+  version: z.literal(1),
+  splitter: z.enum(['recursive','markdown','pdf','html','code','jsonl','csv']),
+  chunkSize: z.number().int().positive(),
+  overlap: z.number().int().nonnegative(),
+  metadata: z.record(z.string()),
+  collection: z.string().min(1).regex(/^[a-z0-9][a-z0-9_-]*$/),
+  embeddingModel: z.string().min(1),
+});
+export type EmbedPlan = z.infer&lt;typeof EmbedPlanSchema&gt;;</code></pre>
+
+<h4><code>src/lockfile.ts</code></h4>
+<pre><code>export const LockfileSchema = z.object({
+  version: z.literal(1),
+  sourcePath: z.string(),
+  sourceHash: z.string().length(64),       // sha256 hex
+  chunkerVersion: z.string(),              // bump on any chunker algo change
+  embeddingProvider: z.string(),
+  embeddingModel: z.string(),
+  dimensions: z.number().int().positive(),
+  collection: z.string(),
+  vectorDb: z.string(),
+  planHash: z.string().length(64),         // sha256 of canonical-JSON EmbedPlan
+  chunks: z.array(z.object({
+    id: z.string().length(16),             // sha256(...)[:16]
+    meta: z.record(z.unknown()),
+  })),
+  timestamp: z.string().datetime(),
+});
+export type Lockfile = z.infer&lt;typeof LockfileSchema&gt;;</code></pre>
+
+<div class="callout"><b>Lockfile location:</b> <code>./.auto-embed/&lt;sha256(absolutePath)[:16]&gt;.lock.json</code>. Directory is created on first write. Recommend in README that users <b>commit</b> <code>.auto-embed/</code> to share idempotency state with CI.</div>
+
+<h2 id="chunker">Recursive chunker algorithm</h2>
+<p>Port of LangChain's <code>RecursiveCharacterTextSplitter</code>, no dep. Pseudocode:</p>
+<pre><code>recursiveSplit(text, separators, chunkSize, overlap):
+  # separators tried in order; first one present in text is used
+  for i, sep in enumerate(separators):
+    if sep == '' or sep in text:
+      parts = text.split(sep) if sep else list(text)
+      out, buf, bufTok = [], [], 0
+      for p in parts:
+        pTok = tokenCount(p)
+        if pTok &gt; chunkSize:
+          if buf: out.push(joinAndOverlap(buf, sep))
+          buf, bufTok = [], 0
+          out.push(...recursiveSplit(p, separators[i+1:], chunkSize, overlap))
+        elif bufTok + pTok + tokenCount(sep) &gt; chunkSize:
+          out.push(joinAndOverlap(buf, sep))
+          buf, bufTok = [p], pTok
+        else:
+          buf.push(p); bufTok += pTok + tokenCount(sep)
+      if buf: out.push(buf.join(sep))
+      return mergeShortNeighbors(out, chunkSize)
+  return [text]
+
+joinAndOverlap(buf, sep):
+  # carry last `overlap` tokens of the joined buf as a prefix on the next chunk
+  # (the carry is applied by the caller in the next iteration)</code></pre>
+
+<h4>Default separators by splitter</h4>
+<table>
+  <thead><tr><th>Splitter</th><th>Separators (in order)</th></tr></thead>
+  <tbody>
+    <tr><td><code>recursive</code></td><td><code>['\n\n', '\n', '. ', ' ', '']</code></td></tr>
+    <tr><td><code>markdown</code></td><td>header-aware pre-split by H1/H2/H3, then recursive within each section</td></tr>
+    <tr><td><code>code</code></td><td><code>['\nclass ', '\nfunction ', '\ndef ', '\n\n', '\n', ' ', '']</code></td></tr>
+    <tr><td><code>csv</code></td><td>row-based, one chunk per row, header prepended to each</td></tr>
+    <tr><td><code>jsonl</code></td><td>line-based, one chunk per line</td></tr>
+  </tbody>
+</table>
+<p><b>Chunker version constant:</b> <code>export const CHUNKER_VERSION = '1';</code> in <code>src/chunker/index.ts</code>. Bump to <code>'2'</code> on <b>any</b> algorithm change. The lockfile-mismatch check uses this string equality.</p>
+
+<h2 id="errors">Error format</h2>
+<p><code>src/errors.ts</code>:</p>
+<pre><code>export enum ExitCode {
+  Success = 0,
+  UserConfig = 1,
+  Parser = 2,
+  ProviderApi = 3,
+  VectorDb = 4,
+  Integrity = 5,
+}
+export class AutoEmbedError extends Error {
+  constructor(message: string, public exitCode: ExitCode, public hint?: string) {
+    super(message);
+  }
+}</code></pre>
+<p>Top-level catch in <code>src/index.ts</code>:</p>
+<ul>
+  <li>print <code>pc.red('✖')</code> + message on stderr</li>
+  <li>if <code>hint</code>: print <code>pc.dim('  hint: ' + hint)</code> on stderr</li>
+  <li>if <code>--verbose</code>: print stack trace</li>
+  <li><code>process.exit(err.exitCode)</code></li>
+</ul>
+<p>All thrown errors at the boundary must be <code>AutoEmbedError</code>. Wrap unexpected errors as <code>new AutoEmbedError(String(err), ExitCode.UserConfig, 'unexpected error; re-run with --verbose')</code>.</p>
+
+<h2 id="fixtures">Test fixtures (M2/M3)</h2>
+<p>Tiny, hand-authored files committed to the repo:</p>
+<table>
+  <thead><tr><th>Fixture</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>test/fixtures/parsers/sample.md</code></td><td>H1, H2, H3, code block, bulleted list, ~400 words</td></tr>
+    <tr><td><code>test/fixtures/parsers/sample.pdf</code></td><td>3 pages, ASCII text only, no images/encryption</td></tr>
+    <tr><td><code>test/fixtures/parsers/sample.html</code></td><td><code>&lt;nav&gt;</code>, <code>&lt;main&gt;</code>, <code>&lt;aside&gt;</code>, <code>&lt;footer&gt;</code> — only <code>&lt;main&gt;</code> should survive</td></tr>
+    <tr><td><code>test/fixtures/parsers/sample.docx</code></td><td>2 headings, 3 paragraphs</td></tr>
+    <tr><td><code>test/fixtures/parsers/sample.csv</code></td><td>10 rows, header row, mixed-type columns</td></tr>
+    <tr><td><code>test/fixtures/parsers/sample.json</code></td><td>array of 5 objects with nested fields</td></tr>
+    <tr><td><code>test/fixtures/parsers/sample.jsonl</code></td><td>5 lines, one JSON object each</td></tr>
+    <tr><td><code>test/fixtures/parsers/sample.txt</code></td><td>~500 words of plain prose, no structure</td></tr>
+    <tr><td><code>test/fixtures/parsers/sample.ts</code></td><td>small TS file with one class and two functions</td></tr>
+    <tr><td><code>test/fixtures/plans/markdown.golden.json</code></td><td>expected heuristic plan for <code>sample.md</code></td></tr>
+    <tr><td><code>test/fixtures/lockfiles/initial.json</code></td><td>known-good lockfile shape for diff tests</td></tr>
+  </tbody>
+</table>
+
+<h2 id="milestones">Milestones</h2>
+
+<div class="milestone">
+  <span class="tag">M0</span><h3>Repo scaffold</h3><span class="duration">½ day</span>
+  <div class="goal">Working <code>npx</code>-able skeleton that prints <code>--help</code>.</div>
+  <ul>
+    <li>Copy <code>package.json</code> / <code>tsup.config.ts</code> / <code>tsconfig.json</code> / <code>vitest.config.ts</code> from <code>auto-seed</code>.</li>
+    <li>Update <code>name</code>, <code>bin</code>, <code>keywords</code>, <code>description</code>.</li>
+    <li><code>src/index.ts</code> with <code>commander</code> + stub subcommands.</li>
+    <li>CI: GitHub Actions running <code>typecheck</code> + <code>test</code> + <code>build</code> on Node 18 / 20 / 22.</li>
+    <li>License, README stub, AGENTS.md, CODE_OF_CONDUCT.md, SECURITY.md, CONTRIBUTING.md.</li>
+  </ul>
+  <div class="accept">
+    <div class="accept-label">Acceptance</div>
+<pre><code>bun run typecheck
+bun run build
+node dist/index.js --help | grep -q "Commands:"
+node dist/index.js --version</code></pre>
+    <p style="margin:0;font-size:14px;color:var(--muted);">All four must succeed with exit 0.</p>
+  </div>
+</div>
+
+<div class="milestone">
+  <span class="tag">M1</span><h3>Config + <code>init</code> + <code>providers</code></h3><span class="duration">1 day</span>
+  <div class="goal">Users can configure providers and DBs interactively.</div>
+  <ul>
+    <li><code>src/config/</code> — read/write <code>~/.auto-embed/config.json</code> (0600), schema in zod, env-var override.</li>
+    <li>Reuse auto-seed's masking helpers (paste-by-reference, don't duplicate).</li>
+    <li><code>auto-embed init</code>: clack-prompt flow → pick embedding provider → paste key → pick vector DB → paste connection → save.</li>
+    <li><code>auto-embed config get|set|list|path</code> (mirror auto-seed).</li>
+    <li><code>auto-embed providers</code>: list all providers, show <code>OK</code> / <code>missing key</code> per row.</li>
+  </ul>
+  <div class="accept">
+    <div class="accept-label">Acceptance</div>
+<pre><code>OPENAI_API_KEY=sk-test node dist/index.js providers   # shows openai: OK
+node dist/index.js config path                        # prints ~/.auto-embed/config.json
+node dist/index.js config set defaults.provider openai
+node dist/index.js config get defaults.provider      # prints "openai"
+stat -c '%a' ~/.auto-embed/config.json               # prints 600</code></pre>
+  </div>
+</div>
+
+<div class="milestone">
+  <span class="tag">M2</span><h3>Parsers</h3><span class="duration">2–3 days</span>
+  <div class="goal">Turn any supported file into a <code>ParsedDocument</code>.</div>
+  <p>Build in this order (each independently testable):</p>
+  <ol>
+    <li><code>src/parsers/text.ts</code> — <code>.txt</code>, <code>.json</code>, <code>.jsonl</code>, <code>.csv</code>, code files.</li>
+    <li><code>src/parsers/markdown.ts</code> — <code>unified</code> + <code>remark-parse</code>, walk AST, emit sections keyed by header path.</li>
+    <li><code>src/parsers/pdf.ts</code> — <code>unpdf</code>, page-by-page text + page-number metadata.</li>
+    <li><code>src/parsers/html.ts</code> — <code>cheerio</code>, strip nav/aside/footer/script, extract semantic blocks.</li>
+    <li><code>src/parsers/docx.ts</code> — <code>mammoth</code> → MD → reuse markdown parser.</li>
+  </ol>
+  <p><code>src/parsers/index.ts</code> — dispatcher: filename → parser, with content-sniff fallback. Golden-file tests under <code>test/fixtures/</code>.</p>
+  <div class="accept">
+    <div class="accept-label">Acceptance</div>
+<pre><code>bun run test test/parsers.test.ts                    # all green</code></pre>
+    <p style="margin:0;font-size:14px;color:var(--muted);">Coverage on <code>src/parsers/**</code> ≥ 80%. Each parser has at least one golden-file test.</p>
+  </div>
+</div>
+
+<div class="milestone">
+  <span class="tag">M3</span><h3>Chunker + Lockfile + dry-run</h3><span class="duration">2 days</span>
+  <div class="goal">Parsed documents become deterministic chunks with stable IDs; dry-run shows the plan.</div>
+  <ul>
+    <li><code>src/chunker/recursive.ts</code> — token-aware recursive char splitter (port of LangChain's algorithm, ~150 LOC, no LangChain dep).</li>
+    <li><code>src/chunker/markdown.ts</code> — header-aware splitter on top of recursive.</li>
+    <li><code>src/chunker/code.ts</code> — language-aware separators (functions, classes, blank lines).</li>
+    <li><code>src/chunker/index.ts</code> — dispatches by <code>splitter</code> field on <code>EmbedPlan</code>.</li>
+    <li><code>src/lockfile.ts</code> — read/write <code>.auto-embed.lock.json</code>; compute file hash; diff old vs new chunk IDs.</li>
+    <li><code>src/plan/heuristic.ts</code> — build an <code>EmbedPlan</code> from file extension alone (no LLM).</li>
+    <li><code>auto-embed embed --dry-run</code> — runs parse + chunk, prints a table of chunks with IDs, sizes, metadata.</li>
+    <li><code>auto-embed plan &lt;file&gt;</code> — writes the heuristic plan to <code>plan.json</code>.</li>
+  </ul>
+  <div class="accept">
+    <div class="accept-label">Acceptance</div>
+<pre><code>bun run test test/chunker.test.ts test/lockfile.test.ts test/plan.test.ts
+node dist/index.js embed test/fixtures/parsers/sample.md --dry-run | grep -E "chunks?"
+# determinism check: same input → same chunk IDs
+H1=$(node dist/index.js embed test/fixtures/parsers/sample.md --dry-run | sha256sum)
+H2=$(node dist/index.js embed test/fixtures/parsers/sample.md --dry-run | sha256sum)
+[ "$H1" = "$H2" ]                                    # exits 0
+node dist/index.js plan test/fixtures/parsers/sample.md  # writes plan.json</code></pre>
+  </div>
+</div>
+
+<div class="milestone">
+  <span class="tag">M4</span><h3>Embedding providers + <code>--local</code> end-to-end</h3><span class="duration">3 days</span>
+  <div class="goal">Chunks become vectors. First "real" pipeline.</div>
+  <ul>
+    <li><code>src/providers/openai.ts</code>, <code>google.ts</code>, <code>voyage.ts</code>, <code>cohere.ts</code>, <code>fastembed.ts</code> — each implements <code>EmbeddingProvider</code>.</li>
+    <li><code>src/embed/engine.ts</code> — batching, concurrency limit (<code>p-limit</code>), exponential backoff retry on 429/5xx.</li>
+    <li>First vector-DB adapter: <code>src/vector-dbs/chroma.ts</code> (easiest local target).</li>
+    <li>Wire up <code>auto-embed embed file.md --local</code> → fastembed + Chroma local → writes vectors to <code>./chroma/</code>.</li>
+  </ul>
+  <div class="ship"><b>Ship checkpoint.</b> The tool is end-to-end functional with <code>--local</code>. This is the smallest publishable version — could ship to npm as <code>0.1.0</code> here. Continue; do not actually publish until M7.</div>
+  <div class="accept">
+    <div class="accept-label">Acceptance</div>
+<pre><code>node dist/index.js embed README.md --local                    # first run: embeds
+node dist/index.js embed README.md --local | grep -q "up to date"   # second run: idempotent
+ls .auto-embed/*.lock.json                                    # lockfile exists
+# editing the file invalidates the lockfile:
+echo "new paragraph" &gt;&gt; README.md
+node dist/index.js embed README.md --local | grep -E "embedded [0-9]+ chunks?"</code></pre>
+  </div>
+</div>
+
+<div class="milestone">
+  <span class="tag">M5</span><h3>Remaining vector-DB adapters</h3><span class="duration">2–3 days</span>
+  <div class="goal">Parity across all v1 vector DBs.</div>
+  <ul>
+    <li><code>src/vector-dbs/pgvector.ts</code> — <code>pg</code> driver, <code>CREATE TABLE IF NOT EXISTS</code>, ON CONFLICT upsert, dimension check via <code>information_schema</code>.</li>
+    <li><code>src/vector-dbs/pinecone.ts</code> — <code>@pinecone-database/pinecone</code>, ensure index, batched upsert, describe-index dimension check.</li>
+    <li><code>src/vector-dbs/qdrant.ts</code> — <code>@qdrant/js-client-rest</code>, ensure collection, upsert, get-collection dimension check.</li>
+    <li><code>src/vector-dbs/index.ts</code> — registry, <code>--db</code> flag dispatch.</li>
+    <li>Pre-flight dimension-mismatch guard wired into the orchestrator (block before any API call).</li>
+  </ul>
+  <div class="accept">
+    <div class="accept-label">Acceptance — unit (always run)</div>
+<pre><code>bun run test test/vector-dbs                                  # mocked clients</code></pre>
+    <div class="accept-label" style="margin-top:14px;">Acceptance — integration (opt-in, real instances)</div>
+<pre><code># pgvector via local Postgres
+INTEGRATION=1 DATABASE_URL=postgres://localhost/test bun run test test/vector-dbs/pgvector.int.test.ts
+# qdrant via docker run -p 6333:6333 qdrant/qdrant
+INTEGRATION=1 QDRANT_URL=http://localhost:6333 bun run test test/vector-dbs/qdrant.int.test.ts
+# pinecone / chroma similarly</code></pre>
+    <div class="accept-label" style="margin-top:14px;">Dimension-mismatch guard</div>
+<pre><code>node dist/index.js embed sample.md --local                    # writes 384-dim vectors
+node dist/index.js embed sample.md --provider openai          # must exit 5 with hint, no API call made</code></pre>
+  </div>
+</div>
+
+<div class="milestone">
+  <span class="tag">M6</span><h3>Optional <code>--plan</code> (LLM-tuned) + polish</h3><span class="duration">1–2 days</span>
+  <div class="goal">The optional LLM planner from PRD §6.4.</div>
+  <ul>
+    <li><code>src/plan/llm.ts</code> — single LLM call (Anthropic/OpenAI/Google, reuse auto-seed's provider abstraction), zod-validated <code>EmbedPlan</code> output.</li>
+    <li><code>--plan</code> flag wired in; <code>--plan &lt;file&gt;</code> loads existing.</li>
+    <li><code>--plan-only</code> writes the plan and exits.</li>
+    <li>Cost estimator on <code>--dry-run</code>: token count × provider price → USD.</li>
+    <li>Pretty output: ingestion summary line, error taxonomy with exit codes (0=success, 1=user/config, 2=parser, 3=provider, 4=vector DB, 5=integrity).</li>
+  </ul>
+  <div class="accept">
+    <div class="accept-label">Acceptance</div>
+<pre><code>ANTHROPIC_API_KEY=sk-ant-... node dist/index.js embed sample.md --plan --dry-run
+# output includes the LLM-tuned plan JSON and an estimated USD cost
+node dist/index.js embed sample.md --plan-only --out plan.json
+node dist/index.js embed sample.md --plan plan.json --local    # reuses plan, no LLM call
+# exit code tests:
+node dist/index.js embed nonexistent.md ; [ $? -eq 1 ]
+node dist/index.js embed test/fixtures/parsers/broken.pdf ; [ $? -eq 2 ]</code></pre>
+  </div>
+</div>
+
+<div class="milestone">
+  <span class="tag">M7</span><h3>Docs, examples, release prep</h3><span class="duration">1–2 days</span>
+  <div class="goal">Ready for <code>npm publish</code>.</div>
+  <ul>
+    <li>Full README (mirror auto-seed's structure).</li>
+    <li><code>docs/</code> with one short page per vector DB and per provider.</li>
+    <li><code>examples/</code> — small repo snippets: ingest-readme, ingest-pdf-corpus, ingest-csv-faq.</li>
+    <li><code>.npmignore</code> / <code>files</code> in <code>package.json</code> cleaned.</li>
+    <li>Verify npm name availability; reserve fallback scope.</li>
+    <li>Manual smoke test on a fresh machine + fresh Node install.</li>
+    <li>Cut <code>v1.0.0</code>, tag, <code>npm publish</code>.</li>
+  </ul>
+  <div class="accept">
+    <div class="accept-label">Acceptance</div>
+<pre><code>npm pack                                                      # produces auto-embed-1.0.0.tgz
+du -sh auto-embed-1.0.0.tgz                                   # well under 30MB
+cd /tmp &amp;&amp; mkdir smoke &amp;&amp; cd smoke
+npm i ../path/to/auto-embed-1.0.0.tgz
+npx auto-embed --version                                      # prints 1.0.0
+npx auto-embed embed ./README.md --local                      # end-to-end smoke
+# only when the above is green:
+npm publish --access public</code></pre>
+  </div>
+</div>
+
+<h2 id="critical-path">Critical-path dependency graph</h2>
+<pre><code>M0 ──▶ M1 ──▶ M2 ──▶ M3 ──▶ M4 ──▶ M5 ──▶ M6 ──▶ M7
+                              │
+                              └──▶ (publishable here as 0.1.0)</code></pre>
+<p>Nothing is parallelizable for a solo dev — each milestone is a prerequisite for the next.</p>
+
+<h2 id="testing">Test strategy</h2>
+<ul>
+  <li><b>Unit:</b> every parser, chunker, lockfile-diff function. Golden fixtures under <code>test/fixtures/</code>. Target ≥ 80% line coverage on <code>src/core/**</code>.</li>
+  <li><b>Provider adapters:</b> mocked at the HTTP layer with <code>msw</code> or hand-rolled fetch stubs.</li>
+  <li><b>Vector DB adapters:</b> mocked clients for unit; opt-in integration suite (<code>INTEGRATION=1 bun run test</code>) for real-instance verification.</li>
+  <li><b>CLI:</b> spawn <code>dist/index.js</code> in a subprocess against <code>test/fixtures/projects/</code>, assert stdout / exit codes.</li>
+  <li><b>Determinism:</b> "run twice, hash output" tests on chunker, lockfile, plan generation.</li>
+</ul>
+
+<h2 id="risks">Risk register</h2>
+<table>
+  <thead>
+    <tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation phase</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Weird PDFs break <code>unpdf</code></td><td>High</td><td>Medium</td><td>M2: detect + clear error; OCR backlog post-v1</td></tr>
+    <tr><td>Provider rate limits during big ingests</td><td>Medium</td><td>High</td><td>M4: batching + concurrency + retry</td></tr>
+    <tr><td>Lockfile churn in git</td><td>Medium</td><td>Low</td><td>README recommends commit; lockfile is small + content-keyed</td></tr>
+    <tr class="risk-row crit"><td>Dimension mismatch corrupts collection</td><td>Low</td><td>Critical</td><td>M5: pre-flight <code>describeCollection</code> check, refuse without <code>--force</code></td></tr>
+    <tr><td>fastembed download (~30 MB) feels slow</td><td>Medium</td><td>Low</td><td>M4: prominent progress bar, document one-time cost</td></tr>
+    <tr><td>npm name taken</td><td>Low</td><td>Medium</td><td>M7: verify early, fallback to scoped name</td></tr>
+  </tbody>
+</table>
+
+<h2 id="oos">Out of scope reminders</h2>
+<ul>
+  <li>No <code>auto-embed db</code> subcommand in v1.</li>
+  <li>No retrieval / query side.</li>
+  <li>No multi-modal.</li>
+  <li>No OCR.</li>
+  <li>No reranking.</li>
+  <li>No watch mode.</li>
+</ul>
+<p>These get a <code>// TODO(v2):</code> marker if they come up during implementation. Do not start them.</p>
+
+<h2 id="dod">Definition of Done — v1.0.0</h2>
+<ul>
+  <li>All v1 file types ingest successfully on fixture corpus.</li>
+  <li>All 4 vector DBs upsert against real instances (manual verification).</li>
+  <li>All 5 providers embed successfully (manual verification).</li>
+  <li><code>npx auto-embed embed README.md --local</code> works on a clean Node 18 / 20 / 22 install.</li>
+  <li>Re-running an unchanged file makes zero API calls.</li>
+  <li>Changing one paragraph of a 100-page PDF re-embeds only the chunks that contain that paragraph.</li>
+  <li>Switching embedding model on the same collection is blocked with an actionable error.</li>
+  <li>README quick-start path verified end-to-end on macOS, Linux, Windows.</li>
+  <li>Package size &lt; 30 MB unpacked.</li>
+  <li>CI green on Node 18, 20, 22.</li>
+</ul>
+
+<footer class="foot">
+  auto-embed implementation plan · companions: <a href="./PRD.md">PRD.md</a> · <a href="./CLAUDE.md">CLAUDE.md</a>
+</footer>
+
+</div>
+</body>
+</html>
