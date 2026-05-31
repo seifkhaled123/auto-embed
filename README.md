@@ -210,12 +210,6 @@ The fastembed model (`BAAI/bge-small-en-v1.5`, ~30 MB) is downloaded once to a l
 
 ---
 
-## Notes
-
-- The npm name `auto-embed` should be verified before first publish. If taken, the package may publish as `@<scope>/auto-embed` while the binary remains `auto-embed`.
-- Built artifact is plain ESM, Node-runnable on Node ≥ 20; `bun` is used for dev/test ergonomics. (Node 18 is EOL and one of our transitive deps — `cheerio`'s bundled `undici` — depends on the `File` global that landed in Node 20.)
-- Prices in the cost estimator are hardcoded (no provider exposes a pricing API). See `src/util/cost.ts` for the `last-verified` date.
-
 ## License
 
 MIT.
