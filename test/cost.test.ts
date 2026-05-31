@@ -20,10 +20,10 @@ describe("estimateCost", () => {
     expect(r.note).toMatch(/free/);
   });
 
-  it("notes free-tier for Google's embedding model", () => {
-    const r = estimateCost(1_000_000, "text-embedding-004");
-    expect(r.usd).toBe(0);
-    expect(r.note).toMatch(/free/);
+  it("prices Google's gemini-embedding-001 at the published rate", () => {
+    const r = estimateCost(1_000_000, "gemini-embedding-001");
+    expect(r.usd).toBeCloseTo(0.15, 6);
+    expect(r.note).toContain("$0.15");
   });
 
   it("returns unknown for an unfamiliar model", () => {
@@ -56,7 +56,7 @@ describe("EMBED_PRICES coverage", () => {
   it("has entries for every M4 default model", () => {
     const required = [
       "text-embedding-3-small",
-      "text-embedding-004",
+      "gemini-embedding-001",
       "voyage-3",
       "embed-english-v3.0",
       "BAAI/bge-small-en-v1.5",

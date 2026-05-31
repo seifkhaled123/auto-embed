@@ -20,11 +20,11 @@ export const EMBED_PRICES: Record<string, ModelPrice> = {
   "text-embedding-3-large": { inputPerM: 0.13 },
   "text-embedding-ada-002": { inputPerM: 0.1 },
 
-  // Google
-  "text-embedding-004": {
-    inputPerM: 0,
-    freeTierNote: "free within published quota",
-  },
+  // Google. `text-embedding-004` was retired 2026-01-14 and replaced by
+  // `gemini-embedding-001`. There is still a free tier for low-volume
+  // testing, but the published per-token rate is $0.15 / 1M tokens — that's
+  // what we estimate against so users aren't surprised at scale.
+  "gemini-embedding-001": { inputPerM: 0.15 },
 
   // Voyage
   "voyage-3": { inputPerM: 0.06 },
@@ -43,7 +43,7 @@ export const EMBED_PRICES: Record<string, ModelPrice> = {
   "intfloat/multilingual-e5-large": { inputPerM: 0 },
 };
 
-export const PRICES_LAST_VERIFIED = "2026-05-01";
+export const PRICES_LAST_VERIFIED = "2026-05-31";
 
 export interface CostEstimate {
   /** Total tokens across all chunks. */

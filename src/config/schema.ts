@@ -14,7 +14,7 @@ export type VectorDbName = z.infer<typeof VectorDbName>;
 
 export const DEFAULT_MODELS: Record<EmbeddingProviderName, string> = {
   openai: "text-embedding-3-small",
-  google: "text-embedding-004",
+  google: "gemini-embedding-001",
   voyage: "voyage-3",
   cohere: "embed-english-v3.0",
   local: "BAAI/bge-small-en-v1.5",
@@ -23,7 +23,11 @@ export const DEFAULT_MODELS: Record<EmbeddingProviderName, string> = {
 export const MODEL_DIMENSIONS: Record<string, number> = {
   "text-embedding-3-small": 1536,
   "text-embedding-3-large": 3072,
-  "text-embedding-004": 768,
+  // Google's gemini-embedding-001 supports Matryoshka output dims (128..3072);
+  // default is 3072 and that's what we record here. Users who want a smaller
+  // dim should pick a fresh --collection name — switching mid-collection
+  // trips the dim-mismatch guard, by design.
+  "gemini-embedding-001": 3072,
   "voyage-3": 1024,
   "voyage-3-lite": 512,
   "embed-english-v3.0": 1024,

@@ -13,7 +13,7 @@ interface GoogleBatchResponse {
 
 class GoogleProvider implements EmbeddingProvider {
   readonly name = "google";
-  readonly defaultModel = "text-embedding-004";
+  readonly defaultModel = "gemini-embedding-001";
   readonly defaultBatchSize = 100;
 
   constructor(private readonly args: Args) {}

@@ -34,7 +34,7 @@ export function buildInitCommand(): Command {
         message: "Which embedding provider?",
         options: [
           { value: "openai", label: "OpenAI", hint: "text-embedding-3-small (1536)" },
-          { value: "google", label: "Google", hint: "text-embedding-004 (768)" },
+          { value: "google", label: "Google", hint: "gemini-embedding-001 (3072)" },
           { value: "voyage", label: "Voyage", hint: "voyage-3 (1024)" },
           { value: "cohere", label: "Cohere", hint: "embed-english-v3.0 (1024)" },
           { value: "local", label: "Local (fastembed)", hint: "BAAI/bge-small-en-v1.5 (384) — no key" },

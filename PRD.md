@@ -96,7 +96,7 @@ Adding more (Weaviate, Supabase, Mongo Atlas Vector, Redis) is a v2 plugin shape
 | Provider | Default model | Dimensions |
 |---|---|---|
 | **OpenAI** | `text-embedding-3-small` | 1536 |
-| **Google** | `text-embedding-004` | 768 |
+| **Google** | `gemini-embedding-001` | 3072 |
 | **Voyage** | `voyage-3` | 1024 |
 | **Cohere** | `embed-english-v3.0` | 1024 |
 | **Local (fastembed)** | `BAAI/bge-small-en-v1.5` | 384 |

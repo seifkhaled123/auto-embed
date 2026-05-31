@@ -46,7 +46,7 @@ The `init` flow asks you to pick an embedding provider, paste a key, pick a vect
 | Embedding provider | Default model | Dim |
 |---|---|---|
 | OpenAI | `text-embedding-3-small` | 1536 |
-| Google | `text-embedding-004` | 768 |
+| Google | `gemini-embedding-001` | 3072 |
 | Voyage | `voyage-3` | 1024 |
 | Cohere | `embed-english-v3.0` | 1024 |
 | Local (fastembed) | `BAAI/bge-small-en-v1.5` | 384 |
