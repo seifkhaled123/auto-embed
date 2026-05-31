@@ -1,0 +1,9 @@
+id,question,answer,tags
+1,How do I install auto-embed?,Run `npx auto-embed --version` to confirm it's reachable; nothing to install.,install/setup
+2,Does auto-embed support PDFs?,Yes — text-extractable PDFs via the `unpdf` parser. Scanned PDFs need OCR (not in v1).,parsers/pdf
+3,Can I run it without API keys?,Yes — `--local` uses fastembed + Chroma. No keys required.,local
+4,What happens on re-runs?,Unchanged files exit with "up to date" and zero API calls. Edited files re-embed only the chunks that changed.,idempotency
+5,Where is the lockfile?,At `./.auto-embed/<hash>.lock.json`. Commit it to share idempotency state with CI.,lockfile
+6,How do I switch embedding models?,Pass `--model <id>` or set `AUTO_EMBED_MODEL`. Switching models mid-collection is refused; use a new `--collection`.,models
+7,Which vector DBs are supported?,Chroma · pgvector · Pinecone · Qdrant in v1.,vector-dbs
+8,How do I tune the chunking strategy?,Either pass `--chunk-size` / `--overlap` / `--splitter` flags or use `--plan` for an LLM-tuned plan.,plan

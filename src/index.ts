@@ -7,7 +7,7 @@ import { buildProvidersCommand } from "./commands/providers.js";
 import { isAutoEmbedError } from "./errors.js";
 import { log, setVerbose, isVerbose } from "./log.js";
 
-const VERSION = "0.0.0";
+const VERSION = "1.0.0";
 
 function buildProgram(): Command {
   const program = new Command();
