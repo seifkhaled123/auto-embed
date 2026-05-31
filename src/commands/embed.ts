@@ -5,8 +5,12 @@ import { countTokensSync, primeTokenizer } from "../chunker/tokens.js";
 import {
   DEFAULT_MODELS,
   EmbeddingProviderName,
+  envApiKey,
   loadConfig,
+  resolveRuntime,
+  VectorDbName,
 } from "../config/index.js";
+import { runPipeline } from "../embed/pipeline.js";
 import { AutoEmbedError, ExitCode } from "../errors.js";
 import { log, pc } from "../log.js";
 import { parseFile } from "../parsers/index.js";
@@ -17,11 +21,17 @@ interface EmbedOpts {
   collection?: string;
   provider?: EmbeddingProviderName;
   model?: string;
+  db?: VectorDbName;
+  local?: boolean;
   splitter?: SplitterName;
   chunkSize?: number;
   overlap?: number;
   metadata?: string;
+  batchSize?: number;
+  concurrency?: number;
+  force?: boolean;
   dryRun?: boolean;
+  yes?: boolean;
 }
 
 export function buildEmbedCommand(): Command {
@@ -46,24 +56,94 @@ export function buildEmbedCommand(): Command {
     .option("--out-vectors <path>", "also write vectors to a local .jsonl")
     .option("-y, --yes", "non-interactive mode")
     .action(async (files: string[], opts: EmbedOpts) => {
-      if (!opts.dryRun) {
-        log.info(pc.dim("embed: full pipeline lands in M4. Use --dry-run for now."));
+      if (opts.dryRun) {
+        for (const file of files) await runDryRun(file, opts);
         return;
       }
-      for (const file of files) {
-        await runDryRun(file, opts);
-      }
+      for (const file of files) await runReal(file, opts);
     });
 }
 
-async function runDryRun(file: string, opts: EmbedOpts): Promise<void> {
+function applyLocalShortcut(opts: EmbedOpts): EmbedOpts {
+  if (!opts.local) return opts;
+  return {
+    ...opts,
+    provider: opts.provider ?? "local",
+    db: opts.db ?? "chroma",
+  };
+}
+
+async function runReal(file: string, rawOpts: EmbedOpts): Promise<void> {
+  const opts = applyLocalShortcut(rawOpts);
   const cfg = await loadConfig();
-  const provider = opts.provider ?? cfg.defaults?.provider ?? "openai";
+
+  const env = process.env;
+  // Resolve provider / model / db without forcing a key when --local.
+  const provider: EmbeddingProviderName =
+    opts.provider ??
+    (env.AUTO_EMBED_PROVIDER as EmbeddingProviderName | undefined) ??
+    cfg.defaults?.provider ??
+    "openai";
   const model =
     opts.model ??
+    env.AUTO_EMBED_MODEL ??
     cfg.defaults?.model ??
     cfg.models?.[provider] ??
     DEFAULT_MODELS[provider];
+  const db: VectorDbName =
+    opts.db ?? (env.AUTO_EMBED_DB as VectorDbName | undefined) ?? cfg.defaults?.db ?? "chroma";
+
+  let apiKey = "";
+  if (provider !== "local") {
+    const resolved = resolveRuntime(cfg, { provider, model, db }, env);
+    apiKey = resolved.apiKey;
+  }
+
+  const outcome = await runPipeline({
+    file,
+    config: cfg,
+    env,
+    resolved: { provider, model, apiKey, db },
+    local: opts.local,
+    force: opts.force,
+    overrides: {
+      collection: opts.collection,
+      splitter: opts.splitter,
+      chunkSize: opts.chunkSize,
+      overlap: opts.overlap,
+      metadata: opts.metadata ? parseMetadata(opts.metadata) : undefined,
+      batchSize: opts.batchSize,
+      concurrency: opts.concurrency,
+    },
+  });
+
+  printOutcome(outcome);
+}
+
+function printOutcome(outcome: Awaited<ReturnType<typeof runPipeline>>): void {
+  // Final-line summary goes to stdout so it's pipeable to grep / a log
+  // shipper. Progress chatter still goes to stderr via log.*.
+  const base = path.basename(outcome.file);
+  if (outcome.kind === "upToDate") {
+    process.stdout.write(
+      `${pc.green("✓")} ${pc.bold(base)} up to date (${outcome.chunkCount} chunk${outcome.chunkCount === 1 ? "" : "s"}, no API calls).\n`,
+    );
+    return;
+  }
+  const { addedCount, removedCount, plan, durationMs } = outcome;
+  const seconds = (durationMs / 1000).toFixed(2);
+  const removed = removedCount > 0 ? ` (removed ${removedCount})` : "";
+  process.stdout.write(
+    `${pc.green("✓")} embedded ${addedCount} chunk${addedCount === 1 ? "" : "s"}${removed} from ${pc.bold(base)} into ${plan.collection} in ${seconds}s\n`,
+  );
+}
+
+async function runDryRun(file: string, rawOpts: EmbedOpts): Promise<void> {
+  const opts = applyLocalShortcut(rawOpts);
+  const cfg = await loadConfig();
+  const provider: EmbeddingProviderName = opts.provider ?? cfg.defaults?.provider ?? "openai";
+  const model =
+    opts.model ?? cfg.defaults?.model ?? cfg.models?.[provider] ?? DEFAULT_MODELS[provider];
 
   const plan: EmbedPlan = heuristicPlan({
     sourcePath: file,
@@ -109,11 +189,8 @@ function printChunks(chunks: { id: string; text: string; meta: Record<string, un
     String(countTokensSync(c.text)),
     formatMeta(c.meta),
   ]);
-  const widths = header.map((h, i) =>
-    Math.max(h.length, ...rows.map((r) => r[i]!.length)),
-  );
-  const fmt = (cells: string[]) =>
-    cells.map((c, i) => c.padEnd(widths[i]!)).join("  ");
+  const widths = header.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i]!.length)));
+  const fmt = (cells: string[]) => cells.map((c, i) => c.padEnd(widths[i]!)).join("  ");
   process.stdout.write(pc.dim(fmt(header)) + "\n");
   for (const row of rows) process.stdout.write(fmt(row) + "\n");
 }
@@ -131,14 +208,11 @@ const META_PRIORITY = [
   "chunkInSection",
   "chunkIndex",
 ];
-
 const META_SKIP = new Set(["sourcePath", "contentType", "columns"]);
 
 function formatMeta(meta: Record<string, unknown>): string {
   const parts: string[] = [];
-  for (const key of META_PRIORITY) {
-    if (key in meta) parts.push(formatPair(key, meta[key]));
-  }
+  for (const key of META_PRIORITY) if (key in meta) parts.push(formatPair(key, meta[key]));
   for (const key of Object.keys(meta).sort()) {
     if (META_SKIP.has(key)) continue;
     if (META_PRIORITY.includes(key)) continue;
@@ -168,3 +242,6 @@ function parseMetadata(raw: string): Record<string, string> {
   }
   return out;
 }
+
+// Re-export to keep envApiKey alive in this module's symbol set (used elsewhere).
+void envApiKey;

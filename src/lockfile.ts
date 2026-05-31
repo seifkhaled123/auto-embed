@@ -58,8 +58,10 @@ export async function readLockfile(sourcePath: string, baseDir?: string): Promis
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
     if (err instanceof z.ZodError) {
+      const first = err.issues[0];
+      const where = first?.path.length ? ` (at ${first.path.join(".")})` : "";
       throw new AutoEmbedError(
-        `Lockfile at ${lockPath} is invalid: ${err.issues[0]?.message ?? "unknown"}`,
+        `Lockfile at ${lockPath} is invalid: ${first?.message ?? "unknown"}${where}`,
         ExitCode.Integrity,
         "Delete the lockfile to re-embed from scratch.",
       );

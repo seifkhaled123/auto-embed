@@ -37,6 +37,9 @@ async function main() {
   const program = buildProgram();
   try {
     await program.parseAsync(process.argv);
+    // CLI: explicitly exit so background workers (onnxruntime-node thread
+    // pool, fastembed cache, chroma child) don't keep the process alive.
+    process.exit(0);
   } catch (err) {
     if (isAutoEmbedError(err)) {
       log.error(err.message);
