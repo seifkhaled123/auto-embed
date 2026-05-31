@@ -29,6 +29,8 @@ export interface PipelineInput {
     db: VectorDbName;
   };
   local?: boolean;
+  /** Pre-resolved plan from CLI; when present the pipeline skips heuristic generation. */
+  plan?: EmbedPlan;
   overrides?: {
     collection?: string;
     splitter?: SplitterName;
@@ -65,17 +67,19 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutcome
   const start = Date.now();
 
   const document = await parseFile(input.file);
-  const plan = heuristicPlan({
-    sourcePath: input.file,
-    embeddingModel: input.resolved.model,
-    overrides: {
-      splitter: input.overrides?.splitter,
-      chunkSize: input.overrides?.chunkSize,
-      overlap: input.overrides?.overlap,
-      collection: input.overrides?.collection,
-      metadata: input.overrides?.metadata,
-    },
-  });
+  const plan: EmbedPlan =
+    input.plan ??
+    heuristicPlan({
+      sourcePath: input.file,
+      embeddingModel: input.resolved.model,
+      overrides: {
+        splitter: input.overrides?.splitter,
+        chunkSize: input.overrides?.chunkSize,
+        overlap: input.overrides?.overlap,
+        collection: input.overrides?.collection,
+        metadata: input.overrides?.metadata,
+      },
+    });
   const planHash = hashPlan(plan);
 
   const chunks = await chunkDocument(document, plan);

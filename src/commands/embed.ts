@@ -1,11 +1,11 @@
+import fsp from "node:fs/promises";
 import path from "node:path";
 import { Command } from "commander";
-import { chunkDocument } from "../chunker/index.js";
+import { Chunk, chunkDocument } from "../chunker/index.js";
 import { countTokensSync, primeTokenizer } from "../chunker/tokens.js";
 import {
   DEFAULT_MODELS,
   EmbeddingProviderName,
-  envApiKey,
   loadConfig,
   resolveRuntime,
   VectorDbName,
@@ -15,7 +15,9 @@ import { AutoEmbedError, ExitCode } from "../errors.js";
 import { log, pc } from "../log.js";
 import { parseFile } from "../parsers/index.js";
 import { heuristicPlan } from "../plan/heuristic.js";
+import { llmPlan, loadPlanFile, resolvePlannerProvider } from "../plan/llm.js";
 import { EmbedPlan, hashPlan, SplitterName } from "../plan/schema.js";
+import { estimateCost, formatUsd } from "../util/cost.js";
 
 interface EmbedOpts {
   collection?: string;
@@ -27,6 +29,10 @@ interface EmbedOpts {
   chunkSize?: number;
   overlap?: number;
   metadata?: string;
+  /** From commander: boolean true when `--plan` alone, string when `--plan <path>`. */
+  plan?: boolean | string;
+  planOnly?: boolean;
+  out?: string;
   batchSize?: number;
   concurrency?: number;
   force?: boolean;
@@ -49,6 +55,7 @@ export function buildEmbedCommand(): Command {
     .option("--metadata <kv>", "static metadata k=v,k=v attached to every chunk")
     .option("--plan [path]", "tune the plan with one LLM call, or reuse a saved plan")
     .option("--plan-only", "write the plan and stop")
+    .option("--out <path>", "where to write the plan when --plan-only is set", "plan.json")
     .option("--batch-size <n>", "embedding batch size", (v) => parseInt(v, 10))
     .option("--concurrency <n>", "parallel embedding requests", (v) => parseInt(v, 10))
     .option("--force", "ignore lockfile; re-embed and replace")
@@ -56,6 +63,10 @@ export function buildEmbedCommand(): Command {
     .option("--out-vectors <path>", "also write vectors to a local .jsonl")
     .option("-y, --yes", "non-interactive mode")
     .action(async (files: string[], opts: EmbedOpts) => {
+      if (opts.planOnly) {
+        for (const file of files) await runPlanOnly(file, opts);
+        return;
+      }
       if (opts.dryRun) {
         for (const file of files) await runDryRun(file, opts);
         return;
@@ -73,23 +84,82 @@ function applyLocalShortcut(opts: EmbedOpts): EmbedOpts {
   };
 }
 
-async function runReal(file: string, rawOpts: EmbedOpts): Promise<void> {
-  const opts = applyLocalShortcut(rawOpts);
-  const cfg = await loadConfig();
+async function resolvePlan(
+  file: string,
+  opts: EmbedOpts,
+  embeddingModel: string,
+): Promise<EmbedPlan> {
+  if (typeof opts.plan === "string") {
+    const loaded = await loadPlanFile(opts.plan);
+    // The plan describes the chunking strategy; the embedding model is
+    // chosen by the runtime (--provider/--local/env/config). Override so
+    // `--plan plan.json --local` works even when the plan was originally
+    // written against a different provider.
+    return { ...loaded, embeddingModel };
+  }
+  const baseOverrides = {
+    splitter: opts.splitter,
+    chunkSize: opts.chunkSize,
+    overlap: opts.overlap,
+    collection: opts.collection,
+    metadata: opts.metadata ? parseMetadata(opts.metadata) : undefined,
+  };
+  if (opts.plan === true) {
+    const { provider, apiKey } = resolvePlannerProvider();
+    log.info(pc.dim(`tuning plan via ${provider}…`));
+    const tuned = await llmPlan({
+      sourcePath: file,
+      embeddingModel,
+      metadata: baseOverrides.metadata,
+      provider,
+      apiKey,
+    });
+    return mergeOverrides(tuned, baseOverrides);
+  }
+  return heuristicPlan({
+    sourcePath: file,
+    embeddingModel,
+    overrides: baseOverrides,
+  });
+}
 
-  const env = process.env;
-  // Resolve provider / model / db without forcing a key when --local.
+function mergeOverrides(
+  plan: EmbedPlan,
+  overrides: { splitter?: SplitterName; chunkSize?: number; overlap?: number; collection?: string; metadata?: Record<string, string> },
+): EmbedPlan {
+  return {
+    ...plan,
+    splitter: overrides.splitter ?? plan.splitter,
+    chunkSize: overrides.chunkSize ?? plan.chunkSize,
+    overlap: overrides.overlap ?? plan.overlap,
+    collection: overrides.collection ?? plan.collection,
+    metadata: { ...plan.metadata, ...(overrides.metadata ?? {}) },
+  };
+}
+
+function resolveModelFromConfig(
+  opts: EmbedOpts,
+  cfg: Awaited<ReturnType<typeof loadConfig>>,
+): { provider: EmbeddingProviderName; model: string } {
   const provider: EmbeddingProviderName =
     opts.provider ??
-    (env.AUTO_EMBED_PROVIDER as EmbeddingProviderName | undefined) ??
+    (process.env.AUTO_EMBED_PROVIDER as EmbeddingProviderName | undefined) ??
     cfg.defaults?.provider ??
     "openai";
   const model =
     opts.model ??
-    env.AUTO_EMBED_MODEL ??
+    process.env.AUTO_EMBED_MODEL ??
     cfg.defaults?.model ??
     cfg.models?.[provider] ??
     DEFAULT_MODELS[provider];
+  return { provider, model };
+}
+
+async function runReal(file: string, rawOpts: EmbedOpts): Promise<void> {
+  const opts = applyLocalShortcut(rawOpts);
+  const cfg = await loadConfig();
+  const { provider, model } = resolveModelFromConfig(opts, cfg);
+  const env = process.env;
   const db: VectorDbName =
     opts.db ?? (env.AUTO_EMBED_DB as VectorDbName | undefined) ?? cfg.defaults?.db ?? "chroma";
 
@@ -99,6 +169,10 @@ async function runReal(file: string, rawOpts: EmbedOpts): Promise<void> {
     apiKey = resolved.apiKey;
   }
 
+  // If --plan with a value is set, the pipeline will see the loaded plan via
+  // resolvePlan. Otherwise the pipeline runs the heuristic plan internally.
+  const plan = await resolvePlan(file, opts, model);
+
   const outcome = await runPipeline({
     file,
     config: cfg,
@@ -106,12 +180,8 @@ async function runReal(file: string, rawOpts: EmbedOpts): Promise<void> {
     resolved: { provider, model, apiKey, db },
     local: opts.local,
     force: opts.force,
+    plan,
     overrides: {
-      collection: opts.collection,
-      splitter: opts.splitter,
-      chunkSize: opts.chunkSize,
-      overlap: opts.overlap,
-      metadata: opts.metadata ? parseMetadata(opts.metadata) : undefined,
       batchSize: opts.batchSize,
       concurrency: opts.concurrency,
     },
@@ -121,8 +191,6 @@ async function runReal(file: string, rawOpts: EmbedOpts): Promise<void> {
 }
 
 function printOutcome(outcome: Awaited<ReturnType<typeof runPipeline>>): void {
-  // Final-line summary goes to stdout so it's pipeable to grep / a log
-  // shipper. Progress chatter still goes to stderr via log.*.
   const base = path.basename(outcome.file);
   if (outcome.kind === "upToDate") {
     process.stdout.write(
@@ -141,33 +209,36 @@ function printOutcome(outcome: Awaited<ReturnType<typeof runPipeline>>): void {
 async function runDryRun(file: string, rawOpts: EmbedOpts): Promise<void> {
   const opts = applyLocalShortcut(rawOpts);
   const cfg = await loadConfig();
-  const provider: EmbeddingProviderName = opts.provider ?? cfg.defaults?.provider ?? "openai";
-  const model =
-    opts.model ?? cfg.defaults?.model ?? cfg.models?.[provider] ?? DEFAULT_MODELS[provider];
+  const { model } = resolveModelFromConfig(opts, cfg);
 
-  const plan: EmbedPlan = heuristicPlan({
-    sourcePath: file,
-    embeddingModel: model,
-    overrides: {
-      splitter: opts.splitter,
-      chunkSize: opts.chunkSize,
-      overlap: opts.overlap,
-      collection: opts.collection,
-      metadata: opts.metadata ? parseMetadata(opts.metadata) : undefined,
-    },
-  });
-
+  const plan = await resolvePlan(file, opts, model);
   const document = await parseFile(file);
   await primeTokenizer();
   const chunks = await chunkDocument(document, plan);
 
-  printPlan(file, plan);
+  printPlan(file, plan, opts);
   printChunks(chunks);
+  printCost(chunks, plan);
 }
 
-function printPlan(file: string, plan: EmbedPlan): void {
+async function runPlanOnly(file: string, rawOpts: EmbedOpts): Promise<void> {
+  const opts = applyLocalShortcut(rawOpts);
+  const cfg = await loadConfig();
+  const { model } = resolveModelFromConfig(opts, cfg);
+  const plan = await resolvePlan(file, opts, model);
+  const outPath = path.resolve(opts.out ?? "plan.json");
+  await fsp.writeFile(outPath, JSON.stringify(plan, null, 2) + "\n");
+  log.success(`wrote plan to ${pc.cyan(outPath)}`);
+}
+
+function printPlan(file: string, plan: EmbedPlan, opts: EmbedOpts): void {
+  const source = typeof opts.plan === "string"
+    ? `loaded from ${opts.plan}`
+    : opts.plan === true
+    ? "LLM-tuned"
+    : "heuristic";
   const lines = [
-    `plan for ${pc.bold(path.basename(file))} (heuristic):`,
+    `plan for ${pc.bold(path.basename(file))} (${source}):`,
     `  splitter:        ${plan.splitter}`,
     `  chunkSize:       ${plan.chunkSize} tokens`,
     `  overlap:         ${plan.overlap} tokens`,
@@ -176,10 +247,13 @@ function printPlan(file: string, plan: EmbedPlan): void {
     `  planHash:        ${hashPlan(plan)}`,
   ];
   for (const line of lines) process.stdout.write(line + "\n");
+  if (Object.keys(plan.metadata).length > 0) {
+    process.stdout.write(`  metadata:        ${JSON.stringify(plan.metadata)}\n`);
+  }
   process.stdout.write("\n");
 }
 
-function printChunks(chunks: { id: string; text: string; meta: Record<string, unknown> }[]): void {
+function printChunks(chunks: Chunk[]): void {
   process.stdout.write(`${chunks.length} chunk${chunks.length === 1 ? "" : "s"} would be embedded:\n`);
   process.stdout.write("\n");
   const header = ["#", "ID", "TOKENS", "META"];
@@ -193,6 +267,15 @@ function printChunks(chunks: { id: string; text: string; meta: Record<string, un
   const fmt = (cells: string[]) => cells.map((c, i) => c.padEnd(widths[i]!)).join("  ");
   process.stdout.write(pc.dim(fmt(header)) + "\n");
   for (const row of rows) process.stdout.write(fmt(row) + "\n");
+}
+
+function printCost(chunks: Chunk[], plan: EmbedPlan): void {
+  const total = chunks.reduce((sum, c) => sum + countTokensSync(c.text), 0);
+  const est = estimateCost(total, plan.embeddingModel);
+  process.stdout.write(`\n`);
+  process.stdout.write(
+    `${pc.dim("cost:")}            ~${formatUsd(est.usd)} (${total.toLocaleString()} tokens × ${plan.embeddingModel}) — ${est.note}\n`,
+  );
 }
 
 const META_PRIORITY = [
@@ -242,6 +325,3 @@ function parseMetadata(raw: string): Record<string, string> {
   }
   return out;
 }
-
-// Re-export to keep envApiKey alive in this module's symbol set (used elsewhere).
-void envApiKey;
