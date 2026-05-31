@@ -4,7 +4,7 @@
 
 ```bash
 export DATABASE_URL=postgres://user:pass@localhost:5432/mydb
-npx auto-embed embed ./docs/handbook.md --db pgvector --collection handbook
+npx @seifkhaled/auto-embed embed ./docs/handbook.md --db pgvector --collection handbook
 ```
 
 ## Config keys

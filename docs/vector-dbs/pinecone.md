@@ -4,7 +4,7 @@
 
 ```bash
 export PINECONE_API_KEY=pcsk-…
-npx auto-embed embed ./docs/handbook.md --db pinecone --collection handbook
+npx @seifkhaled/auto-embed embed ./docs/handbook.md --db pinecone --collection handbook
 ```
 
 ## Config keys

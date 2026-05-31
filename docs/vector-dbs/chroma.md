@@ -3,7 +3,7 @@
 ## Quick start (local, zero setup)
 
 ```bash
-npx auto-embed embed ./docs/handbook.md --local
+npx @seifkhaled/auto-embed embed ./docs/handbook.md --local
 # spawns `chroma run --path ./chroma` in the background on first use,
 # leaves it running so subsequent invocations reuse it.
 ```
@@ -12,7 +12,7 @@ npx auto-embed embed ./docs/handbook.md --local
 
 ```bash
 CHROMA_URL=https://chroma.internal:8000 \
-  npx auto-embed embed ./docs/handbook.md --db chroma
+  npx @seifkhaled/auto-embed embed ./docs/handbook.md --db chroma
 ```
 
 ## Config keys

@@ -8,18 +8,18 @@ Glob ingestion of several PDFs into one collection. Demonstrates `--dry-run` for
 cd examples/ingest-pdf-corpus
 
 # Preview the plan + chunk count + USD cost without making any API calls
-npx auto-embed embed "./pdfs/*.pdf" --provider openai --dry-run
+npx @seifkhaled/auto-embed embed "./pdfs/*.pdf" --provider openai --dry-run
 
 # Run for real (OpenAI + auto-spawned local Chroma)
 OPENAI_API_KEY=sk-… \
-  npx auto-embed embed "./pdfs/*.pdf" \
+  npx @seifkhaled/auto-embed embed "./pdfs/*.pdf" \
     --provider openai \
     --db chroma \
     --collection product-docs \
     --concurrency 8
 
 # Or fully local, no API key:
-npx auto-embed embed "./pdfs/*.pdf" --local --collection product-docs
+npx @seifkhaled/auto-embed embed "./pdfs/*.pdf" --local --collection product-docs
 ```
 
 ## Notes

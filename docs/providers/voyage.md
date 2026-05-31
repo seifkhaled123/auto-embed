@@ -4,7 +4,7 @@
 
 ```bash
 export VOYAGE_API_KEY=…
-npx auto-embed embed ./docs/handbook.md --provider voyage
+npx @seifkhaled/auto-embed embed ./docs/handbook.md --provider voyage
 ```
 
 ## Models

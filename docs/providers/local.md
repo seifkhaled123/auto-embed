@@ -3,7 +3,7 @@
 ## Quick start
 
 ```bash
-npx auto-embed embed ./docs/handbook.md --local
+npx @seifkhaled/auto-embed embed ./docs/handbook.md --local
 # equivalent to: --provider local --db chroma --collection <derived>
 ```
 

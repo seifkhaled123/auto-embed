@@ -1,5 +1,5 @@
 {
-  "name": "auto-embed",
+  "name": "@seifkhaled/auto-embed",
   "version": "1.0.0",
   "description": "Zero-config CLI that ingests files into vector databases for RAG projects. Parse, chunk, embed, upsert — one command.",
   "type": "module",
@@ -7,6 +7,17 @@
     "auto-embed": "dist/index.js"
   },
   "main": "./dist/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/seifkhaled123/auto-embed.git"
+  },
+  "bugs": {
+    "url": "https://github.com/seifkhaled123/auto-embed/issues"
+  },
+  "homepage": "https://github.com/seifkhaled123/auto-embed#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist",
     "README.md",

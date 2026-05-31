@@ -9,10 +9,10 @@ The smallest possible flow. Embeds one markdown file locally into Chroma, then d
 cd examples/ingest-readme
 
 # First run: parses, chunks, embeds, upserts
-npx auto-embed embed ./input.md --local
+npx @seifkhaled/auto-embed embed ./input.md --local
 
 # Second run: zero API calls, exits in ~50ms
-npx auto-embed embed ./input.md --local
+npx @seifkhaled/auto-embed embed ./input.md --local
 
 # Edit a paragraph in input.md, run again — only the changed chunks re-embed
 ```

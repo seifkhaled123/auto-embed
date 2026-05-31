@@ -13,9 +13,9 @@
 It is the sibling of [`auto-seed`](https://www.npmjs.com/package/auto-seed): same opinionated, one-command philosophy, same config model, same target audience (application developers who want to skip 80% of the RAG-ingest plumbing).
 
 ```bash
-npx auto-embed init                              # one-time: pick embedding provider + vector DB
-npx auto-embed embed ./docs/handbook.pdf         # parse → chunk → embed → upsert
-npx auto-embed embed ./docs/**/*.md --collection handbook
+npx @seifkhaled/auto-embed init                              # one-time: pick embedding provider + vector DB
+npx @seifkhaled/auto-embed embed ./docs/handbook.pdf         # parse → chunk → embed → upsert
+npx @seifkhaled/auto-embed embed ./docs/**/*.md --collection handbook
 ```
 
 ---
@@ -216,7 +216,7 @@ auto-embed --version
 | Lockfile drift between machines (CI vs laptop) | Lockfile is per-file and content-keyed; safe to commit or `.gitignore` — README recommends committing |
 | Vector-DB schema drift (e.g. user changes index dimension externally) | Pre-flight check: query the collection's existing dimension before writing |
 | `fastembed` model download (~30 MB) on first `--local` run feels slow | Print a clear "downloading model (one-time)…" with progress bar |
-| npm name `auto-embed` may be taken | Verify before publish; fallback `@<scope>/auto-embed` with `bin: auto-embed` preserved |
+| npm name `auto-embed` may be taken | **Materialised:** npm rejected `auto-embed` due to similarity to existing `autoembed`. Published as `@seifkhaled/auto-embed`; `bin: auto-embed` preserved. |
 
 ### Open questions to resolve before build
 

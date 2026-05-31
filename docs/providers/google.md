@@ -4,7 +4,7 @@
 
 ```bash
 export GOOGLE_API_KEY=AIza…
-npx auto-embed embed ./docs/handbook.md --provider google
+npx @seifkhaled/auto-embed embed ./docs/handbook.md --provider google
 ```
 
 ## Models

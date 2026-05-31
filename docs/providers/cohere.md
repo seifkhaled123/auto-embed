@@ -4,7 +4,7 @@
 
 ```bash
 export COHERE_API_KEY=…
-npx auto-embed embed ./docs/handbook.md --provider cohere
+npx @seifkhaled/auto-embed embed ./docs/handbook.md --provider cohere
 ```
 
 ## Models

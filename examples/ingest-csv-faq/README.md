@@ -8,10 +8,10 @@ CSV ingestion: one chunk per row, with the header preserved as structured metada
 cd examples/ingest-csv-faq
 
 # Preview the plan and the per-row chunks
-npx auto-embed embed ./faq.csv --local --dry-run
+npx @seifkhaled/auto-embed embed ./faq.csv --local --dry-run
 
 # Embed locally
-npx auto-embed embed ./faq.csv \
+npx @seifkhaled/auto-embed embed ./faq.csv \
   --local \
   --collection support-faq \
   --metadata "category=support,product=auto-embed"

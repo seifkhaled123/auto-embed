@@ -15,16 +15,29 @@ Sibling of [`auto-seed`](https://www.npmjs.com/package/auto-seed) — same opini
 
 ---
 
+## Install
+
+Published on npm as `@seifkhaled/auto-embed`. The CLI binary is `auto-embed`.
+
+```bash
+# One-off (no install):
+npx @seifkhaled/auto-embed embed ./README.md --local
+
+# Or install globally and use the short name:
+npm i -g @seifkhaled/auto-embed
+auto-embed embed ./README.md --local
+```
+
 ## Quick start
 
 ```bash
 # Zero-key prototype: fastembed + Chroma, no setup needed
-npx auto-embed embed ./README.md --local
+npx @seifkhaled/auto-embed embed ./README.md --local
 
 # Or: configure a real provider + DB once
-npx auto-embed init
-npx auto-embed embed ./docs/handbook.pdf
-npx auto-embed embed "./docs/**/*.md" --collection handbook
+npx @seifkhaled/auto-embed init
+npx @seifkhaled/auto-embed embed ./docs/handbook.pdf
+npx @seifkhaled/auto-embed embed "./docs/**/*.md" --collection handbook
 ```
 
 The `init` flow asks you to pick an embedding provider, paste a key, pick a vector DB, and paste a connection. The config lives in `~/.auto-embed/config.json` with mode `0600` and is masked on display.
@@ -93,24 +106,24 @@ Run `auto-embed embed --help` for the complete list.
 
 ```bash
 # Smallest possible flow: embed the README locally
-npx auto-embed embed ./README.md --local
+npx @seifkhaled/auto-embed embed ./README.md --local
 
 # Real flow: PDFs into Pinecone
-PINECONE_API_KEY=… npx auto-embed embed ./docs/handbook.pdf \
+PINECONE_API_KEY=… npx @seifkhaled/auto-embed embed ./docs/handbook.pdf \
   --provider openai --db pinecone --collection handbook
 
 # Preview a plan + cost without making API calls
-npx auto-embed embed ./docs/handbook.pdf --dry-run
+npx @seifkhaled/auto-embed embed ./docs/handbook.pdf --dry-run
 
 # Tune the plan with one LLM call, then run offline forever
-ANTHROPIC_API_KEY=sk-ant-… npx auto-embed embed ./docs/handbook.pdf --plan --plan-only
-npx auto-embed embed ./docs/handbook.pdf --plan plan.json --provider openai --db chroma
+ANTHROPIC_API_KEY=sk-ant-… npx @seifkhaled/auto-embed embed ./docs/handbook.pdf --plan --plan-only
+npx @seifkhaled/auto-embed embed ./docs/handbook.pdf --plan plan.json --provider openai --db chroma
 
 # Glob ingestion
-npx auto-embed embed "./docs/**/*.md" --collection handbook --concurrency 8
+npx @seifkhaled/auto-embed embed "./docs/**/*.md" --collection handbook --concurrency 8
 
 # CI: deterministic, non-interactive
-DATABASE_URL=… npx auto-embed embed ./docs/handbook.md \
+DATABASE_URL=… npx @seifkhaled/auto-embed embed ./docs/handbook.md \
   --provider openai --db pgvector --collection handbook --yes
 ```
 

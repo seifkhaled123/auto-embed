@@ -7,12 +7,12 @@
 docker run -d -p 6333:6333 -p 6334:6334 qdrant/qdrant
 
 export QDRANT_URL=http://localhost:6333
-npx auto-embed embed ./docs/handbook.md --db qdrant --collection handbook
+npx @seifkhaled/auto-embed embed ./docs/handbook.md --db qdrant --collection handbook
 
 # Hosted Qdrant Cloud:
 export QDRANT_URL=https://your-cluster.qdrant.io
 export QDRANT_API_KEY=…
-npx auto-embed embed ./docs/handbook.md --db qdrant --collection handbook
+npx @seifkhaled/auto-embed embed ./docs/handbook.md --db qdrant --collection handbook
 ```
 
 ## Config keys

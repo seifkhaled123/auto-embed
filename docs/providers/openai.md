@@ -4,7 +4,7 @@
 
 ```bash
 export OPENAI_API_KEY=sk-…
-npx auto-embed embed ./docs/handbook.md --provider openai
+npx @seifkhaled/auto-embed embed ./docs/handbook.md --provider openai
 ```
 
 ## Models

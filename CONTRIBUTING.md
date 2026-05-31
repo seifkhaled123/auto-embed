@@ -69,7 +69,7 @@ Read [PRD.md](./PRD.md) for the spec and [PLAN.md](./PLAN.md) for the milestone 
 - **Lazy imports.** Parser, provider, and DB-adapter modules `await import('…')` at use time, not at top-level. Cold-start budget is 500 ms.
 - **Mask keys.** Never `console.log` a key. Never write a key to a generated file or to the lockfile.
 - **Tests, ideally first.** New parser cases need a fixture under `test/fixtures/parsers/`. New adapters need HTTP-mocked tests; opt-in integration tests live behind `INTEGRATION=1`.
-- **Don't broaden the dependency tree casually.** Each runtime dep ships to every `npx auto-embed` user. See [CLAUDE.md](./CLAUDE.md) § "Anti-patterns" for things explicitly excluded (`langchain`, `pdf-parse`, `node-fetch`).
+- **Don't broaden the dependency tree casually.** Each runtime dep ships to every `npx @seifkhaled/auto-embed` user. See [CLAUDE.md](./CLAUDE.md) § "Anti-patterns" for things explicitly excluded (`langchain`, `pdf-parse`, `node-fetch`).
 
 ## Commit messages
 
