@@ -195,7 +195,7 @@ auto-embed --version
 
 - **Install size:** under 30 MB unpacked (excluding fastembed model, which is lazy-downloaded on first `--local` use).
 - **Cold start:** under 500 ms for `--help` / `--version`.
-- **Node compatibility:** Node ≥ 18.
+- **Node compatibility:** Node ≥ 20. (Node 18 was originally targeted but dropped post-v1.0.0 — `cheerio` requires the `File` global which only exists from Node 20.)
 - **Cross-platform:** Linux, macOS, Windows.
 - **Test coverage:** core parsers, chunker, lockfile logic, and provider adapters mocked. Aim for ≥ 80% line coverage on `src/core/**`.
 - **Security:** no API key ever written to a generated file or logged in full; lockfile contains no secrets.

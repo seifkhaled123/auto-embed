@@ -23,7 +23,7 @@ node dist/index.js ...   # exercise the built CLI
 
 ## Tech stack (locked — do not swap)
 
-- **Runtime:** Node ≥ 18, ESM only, TypeScript strict.
+- **Runtime:** Node ≥ 20, ESM only, TypeScript strict. (Node 18 was dropped after v1.0.0: cheerio's bundled undici needs the `File` global, which only exists from Node 20+.)
 - **Build:** `tsup` → single ESM bundle in `dist/`.
 - **CLI:** `commander` (args), `@clack/prompts` (interactive), `ora` (spinners), `picocolors` (color).
 - **Validation:** `zod` v3 (NOT v4; stay aligned with auto-seed).

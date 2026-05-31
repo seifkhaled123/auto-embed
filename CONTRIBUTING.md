@@ -21,7 +21,7 @@ Participation in this project is governed by the [Code of Conduct](CODE_OF_CONDU
 
 Requirements:
 
-- **Node.js ≥ 18**
+- **Node.js ≥ 20**
 - **Bun ≥ 1.0** (used for dev scripts and tests; the published artifact is plain Node-runnable ESM)
 
 ```bash
