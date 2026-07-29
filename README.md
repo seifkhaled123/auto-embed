@@ -91,7 +91,7 @@ See [`docs/providers/`](./docs/providers/) and [`docs/vector-dbs/`](./docs/vecto
 | `--plan` | off | One LLM call to tune the plan (cheap; reuse via `--plan plan.json`). |
 | `--plan <path>` | — | Reuse a saved plan; **skips the LLM call entirely**. |
 | `--plan-only` | off | Write the plan and stop; no embedding. |
-| `--out <path>` | mode-dependent | Output path for `--plan-only` (`plan.json`) or `--show-chunks` (`chunks.txt`). |
+| `--out <path>` | mode-dependent | Output path for `--plan-only` (`plan.json`) or one combined `--show-chunks` report. |
 | `--batch-size <n>` | provider default | Batch size for embedding API calls. |
 | `--concurrency <n>` | `4` | Parallel embedding requests. |
 | `--force` | off | Ignore the lockfile; re-embed and replace. |
@@ -136,9 +136,9 @@ More patterns in [`examples/`](./examples/).
 
 ### Inspect chunks without embedding
 
-Pass `--show-chunks` to stop after parsing and chunking. The command writes `chunks.txt` by default and does not initialize an embedding provider, connect to a vector database, write a lockfile, or create any embeddings. Each entry contains the exact chunk text, its deterministic ID, token count, and metadata.
+Pass `--show-chunks` to stop after parsing and chunking. Without `--out`, each input writes a source-specific report named `<filename>-chunks.txt` in the current directory (for example, `handbook.pdf` writes `handbook-chunks.txt`). Pass `--out <path>` to combine multiple inputs into one report. This mode does not initialize an embedding provider, connect to a vector database, write a lockfile, or create any embeddings. Each entry contains the exact chunk text, its deterministic ID, token count, and metadata.
 
-Use `--out <path>.txt` to choose a different output file. When multiple input files are provided, their chunks are collected into the same report.
+Use `--out <path>.txt` to choose a different output file. When `--out` is provided with multiple input files, their chunks are collected into that report.
 
 ---
 

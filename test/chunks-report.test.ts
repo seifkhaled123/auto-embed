@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { primeTokenizer } from "../src/chunker/tokens.js";
 import {
   ChunkReportEntry,
+  defaultChunksReportPath,
   renderChunksReport,
   writeChunksReport,
 } from "../src/commands/chunks-report.js";
@@ -43,6 +44,15 @@ afterEach(async () => {
 });
 
 describe("chunk report", () => {
+  it("derives a source-specific default filename in the current directory", () => {
+    expect(defaultChunksReportPath("docs/guide.md")).toBe(
+      path.resolve("guide-chunks.txt"),
+    );
+    expect(defaultChunksReportPath("reports/quarter.final.pdf")).toBe(
+      path.resolve("quarter.final-chunks.txt"),
+    );
+  });
+
   it("includes the exact text, ID, token count, and metadata", () => {
     const report = renderChunksReport(entries);
 

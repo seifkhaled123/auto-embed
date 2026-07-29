@@ -20,6 +20,7 @@ import { EmbedPlan, hashPlan, SplitterName } from "../plan/schema.js";
 import { estimateCost, formatUsd } from "../util/cost.js";
 import {
   ChunkReportEntry,
+  defaultChunksReportPath,
   writeChunksReport,
 } from "./chunks-report.js";
 
@@ -60,7 +61,10 @@ export function buildEmbedCommand(): Command {
     .option("--metadata <kv>", "static metadata k=v,k=v attached to every chunk")
     .option("--plan [path]", "tune the plan with one LLM call, or reuse a saved plan")
     .option("--plan-only", "write the plan and stop")
-    .option("--out <path>", "output path for --plan-only or --show-chunks")
+    .option(
+      "--out <path>",
+      "output path for --plan-only or a combined --show-chunks report",
+    )
     .option("--batch-size <n>", "embedding batch size", (v) => parseInt(v, 10))
     .option("--concurrency <n>", "parallel embedding requests", (v) => parseInt(v, 10))
     .option("--force", "ignore lockfile; re-embed and replace")
@@ -255,11 +259,24 @@ async function runShowChunks(files: string[], rawOpts: EmbedOpts): Promise<void>
     entries.push({ file, plan, chunks });
   }
 
-  const outputPath = await writeChunksReport(entries, opts.out ?? "chunks.txt");
-  const totalChunks = entries.reduce((sum, entry) => sum + entry.chunks.length, 0);
-  log.success(
-    `wrote ${totalChunks} chunk${totalChunks === 1 ? "" : "s"} to ${pc.cyan(outputPath)} (no embeddings created)`,
-  );
+  if (opts.out) {
+    const outputPath = await writeChunksReport(entries, opts.out);
+    const totalChunks = entries.reduce((sum, entry) => sum + entry.chunks.length, 0);
+    log.success(
+      `wrote ${totalChunks} chunk${totalChunks === 1 ? "" : "s"} to ${pc.cyan(outputPath)} (no embeddings created)`,
+    );
+    return;
+  }
+
+  for (const entry of entries) {
+    const outputPath = await writeChunksReport(
+      [entry],
+      defaultChunksReportPath(entry.file),
+    );
+    log.success(
+      `wrote ${entry.chunks.length} chunk${entry.chunks.length === 1 ? "" : "s"} from ${pc.bold(path.basename(entry.file))} to ${pc.cyan(outputPath)} (no embeddings created)`,
+    );
+  }
 }
 
 async function runPlanOnly(file: string, rawOpts: EmbedOpts): Promise<void> {

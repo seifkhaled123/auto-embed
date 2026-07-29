@@ -11,6 +11,11 @@ export interface ChunkReportEntry {
   chunks: Chunk[];
 }
 
+export function defaultChunksReportPath(file: string): string {
+  const { name } = path.parse(file);
+  return path.resolve(`${name}-chunks.txt`);
+}
+
 export function renderChunksReport(entries: ChunkReportEntry[]): string {
   const totalChunks = entries.reduce((sum, entry) => sum + entry.chunks.length, 0);
   const lines = [
