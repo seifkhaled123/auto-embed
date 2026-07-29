@@ -91,11 +91,12 @@ See [`docs/providers/`](./docs/providers/) and [`docs/vector-dbs/`](./docs/vecto
 | `--plan` | off | One LLM call to tune the plan (cheap; reuse via `--plan plan.json`). |
 | `--plan <path>` | — | Reuse a saved plan; **skips the LLM call entirely**. |
 | `--plan-only` | off | Write the plan and stop; no embedding. |
-| `--out <path>` | `plan.json` | Where to write the plan when `--plan-only` is set. |
+| `--out <path>` | mode-dependent | Output path for `--plan-only` (`plan.json`) or `--show-chunks` (`chunks.txt`). |
 | `--batch-size <n>` | provider default | Batch size for embedding API calls. |
 | `--concurrency <n>` | `4` | Parallel embedding requests. |
 | `--force` | off | Ignore the lockfile; re-embed and replace. |
 | `--dry-run` | off | Print the plan + chunk table + USD cost estimate; embed nothing. |
+| `--show-chunks` | off | Write every would-be chunk to a text file; embed nothing. |
 | `--verbose` | off | Debug logging. |
 
 Run `auto-embed embed --help` for the complete list.
@@ -115,6 +116,10 @@ PINECONE_API_KEY=… npx @seifkhaled/auto-embed embed ./docs/handbook.pdf \
 # Preview a plan + cost without making API calls
 npx @seifkhaled/auto-embed embed ./docs/handbook.pdf --dry-run
 
+# Inspect the exact chunk text and metadata without embedding anything
+npx @seifkhaled/auto-embed embed ./docs/handbook.pdf --show-chunks
+npx @seifkhaled/auto-embed embed ./docs/one.md ./docs/two.md --show-chunks --out docs-chunks.txt
+
 # Tune the plan with one LLM call, then run offline forever
 ANTHROPIC_API_KEY=sk-ant-… npx @seifkhaled/auto-embed embed ./docs/handbook.pdf --plan --plan-only
 npx @seifkhaled/auto-embed embed ./docs/handbook.pdf --plan plan.json --provider openai --db chroma
@@ -128,6 +133,12 @@ DATABASE_URL=… npx @seifkhaled/auto-embed embed ./docs/handbook.md \
 ```
 
 More patterns in [`examples/`](./examples/).
+
+### Inspect chunks without embedding
+
+Pass `--show-chunks` to stop after parsing and chunking. The command writes `chunks.txt` by default and does not initialize an embedding provider, connect to a vector database, write a lockfile, or create any embeddings. Each entry contains the exact chunk text, its deterministic ID, token count, and metadata.
+
+Use `--out <path>.txt` to choose a different output file. When multiple input files are provided, their chunks are collected into the same report.
 
 ---
 

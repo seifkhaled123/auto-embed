@@ -18,6 +18,10 @@ import { heuristicPlan } from "../plan/heuristic.js";
 import { llmPlan, loadPlanFile, resolvePlannerProvider } from "../plan/llm.js";
 import { EmbedPlan, hashPlan, SplitterName } from "../plan/schema.js";
 import { estimateCost, formatUsd } from "../util/cost.js";
+import {
+  ChunkReportEntry,
+  writeChunksReport,
+} from "./chunks-report.js";
 
 interface EmbedOpts {
   collection?: string;
@@ -37,6 +41,7 @@ interface EmbedOpts {
   concurrency?: number;
   force?: boolean;
   dryRun?: boolean;
+  showChunks?: boolean;
   yes?: boolean;
 }
 
@@ -55,16 +60,22 @@ export function buildEmbedCommand(): Command {
     .option("--metadata <kv>", "static metadata k=v,k=v attached to every chunk")
     .option("--plan [path]", "tune the plan with one LLM call, or reuse a saved plan")
     .option("--plan-only", "write the plan and stop")
-    .option("--out <path>", "where to write the plan when --plan-only is set", "plan.json")
+    .option("--out <path>", "output path for --plan-only or --show-chunks")
     .option("--batch-size <n>", "embedding batch size", (v) => parseInt(v, 10))
     .option("--concurrency <n>", "parallel embedding requests", (v) => parseInt(v, 10))
     .option("--force", "ignore lockfile; re-embed and replace")
     .option("--dry-run", "show what would happen; embed nothing")
+    .option("--show-chunks", "write all would-be chunks to a .txt file; embed nothing")
     .option("--out-vectors <path>", "also write vectors to a local .jsonl")
     .option("-y, --yes", "non-interactive mode")
     .action(async (files: string[], opts: EmbedOpts) => {
+      assertPreviewMode(opts);
       if (opts.planOnly) {
         for (const file of files) await runPlanOnly(file, opts);
+        return;
+      }
+      if (opts.showChunks) {
+        await runShowChunks(files, opts);
         return;
       }
       if (opts.dryRun) {
@@ -73,6 +84,15 @@ export function buildEmbedCommand(): Command {
       }
       for (const file of files) await runReal(file, opts);
     });
+}
+
+function assertPreviewMode(opts: EmbedOpts): void {
+  const selected = [opts.planOnly, opts.dryRun, opts.showChunks].filter(Boolean);
+  if (selected.length <= 1) return;
+  throw new AutoEmbedError(
+    "Choose only one of --plan-only, --dry-run, or --show-chunks.",
+    ExitCode.UserConfig,
+  );
 }
 
 function applyLocalShortcut(opts: EmbedOpts): EmbedOpts {
@@ -219,6 +239,27 @@ async function runDryRun(file: string, rawOpts: EmbedOpts): Promise<void> {
   printPlan(file, plan, opts);
   printChunks(chunks);
   printCost(chunks, plan);
+}
+
+async function runShowChunks(files: string[], rawOpts: EmbedOpts): Promise<void> {
+  const opts = applyLocalShortcut(rawOpts);
+  const cfg = await loadConfig();
+  const { model } = resolveModelFromConfig(opts, cfg);
+  const entries: ChunkReportEntry[] = [];
+
+  await primeTokenizer();
+  for (const file of files) {
+    const plan = await resolvePlan(file, opts, model);
+    const document = await parseFile(file);
+    const chunks = await chunkDocument(document, plan);
+    entries.push({ file, plan, chunks });
+  }
+
+  const outputPath = await writeChunksReport(entries, opts.out ?? "chunks.txt");
+  const totalChunks = entries.reduce((sum, entry) => sum + entry.chunks.length, 0);
+  log.success(
+    `wrote ${totalChunks} chunk${totalChunks === 1 ? "" : "s"} to ${pc.cyan(outputPath)} (no embeddings created)`,
+  );
 }
 
 async function runPlanOnly(file: string, rawOpts: EmbedOpts): Promise<void> {
