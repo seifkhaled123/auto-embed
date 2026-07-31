@@ -2,12 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    branches: ["**"]
 
 jobs:
   build:
+    if: endsWith(github.event.head_commit.message, '[trigger-cd]')
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
