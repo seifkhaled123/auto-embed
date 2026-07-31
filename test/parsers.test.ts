@@ -1,6 +1,8 @@
+import fsp from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import url from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { parseFile } from "../src/parsers/index.js";
 import { parseCsvRows } from "../src/parsers/text.js";
 
@@ -8,8 +10,44 @@ const here = path.dirname(url.fileURLToPath(import.meta.url));
 const fx = (name: string) => path.join(here, "fixtures", "parsers", name);
 
 describe("dispatcher", () => {
-  it("throws AutoEmbedError on unsupported extension", async () => {
-    await expect(parseFile(fx("nope.xyz"))).rejects.toThrow(/Unsupported file type/);
+  it("falls back to recursive text for an unknown text-like extension", async () => {
+    const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "auto-embed-sniff-"));
+    const file = path.join(tmp, "notes.xyz");
+    await fsp.writeFile(file, "plain text with an unfamiliar extension\n");
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const doc = await parseFile(file);
+      expect(doc.contentType).toBe("text");
+      expect(doc.sections[0]!.text).toContain("plain text");
+      expect(stderr).toHaveBeenCalledWith(expect.stringMatching(/falling back to text/i));
+    } finally {
+      stderr.mockRestore();
+      await fsp.rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("sniffs structured content when the extension is wrong", async () => {
+    const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "auto-embed-sniff-"));
+    const file = path.join(tmp, "records.data");
+    await fsp.writeFile(file, '[{"id":1},{"id":2}]\n');
+    try {
+      const doc = await parseFile(file);
+      expect(doc.contentType).toBe("json");
+      expect(doc.sections).toHaveLength(2);
+    } finally {
+      await fsp.rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects unknown binary content instead of decoding it as text", async () => {
+    const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "auto-embed-sniff-"));
+    const file = path.join(tmp, "blob.xyz");
+    await fsp.writeFile(file, Buffer.from([0, 1, 2, 3, 255, 0, 10]));
+    try {
+      await expect(parseFile(file)).rejects.toThrow(/unsupported binary file/i);
+    } finally {
+      await fsp.rm(tmp, { recursive: true, force: true });
+    }
   });
 
   it("throws on missing file", async () => {

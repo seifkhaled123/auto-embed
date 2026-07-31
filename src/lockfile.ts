@@ -36,9 +36,10 @@ export function lockfilePathFor(sourcePath: string, baseDir: string = process.cw
 }
 
 export async function hashFile(sourcePath: string): Promise<string> {
+  const hash = crypto.createHash("sha256");
   try {
-    const buf = await fsp.readFile(sourcePath);
-    return crypto.createHash("sha256").update(buf).digest("hex");
+    for await (const chunk of fs.createReadStream(sourcePath)) hash.update(chunk as Buffer);
+    return hash.digest("hex");
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
       throw new AutoEmbedError(`File not found: ${sourcePath}`, ExitCode.UserConfig);

@@ -13,6 +13,18 @@
 
 Sibling of [`auto-seed`](https://www.npmjs.com/package/auto-seed) — same opinionated, one-command philosophy.
 
+## What's new in v1.2
+
+- **Real repository inputs.** Mix explicit files, quoted globs, and recursive directories. Paths are normalized, de-duplicated, and sorted before ingestion; repository build/cache directories and symlink recursion are skipped safely.
+- **Content-safe fallback.** Unknown text extensions fall back with a warning, while binary content and malformed supported formats fail clearly instead of producing garbage chunks.
+- **Inspectable atomic vectors.** `--out-vectors <file>.jsonl` writes one ordered, credential-free vector export and exposes it only after the entire run succeeds.
+- **Crash-safe continuation.** Batch checkpoints prevent successful embeddings from being paid for twice. Replacement vectors land before old IDs are deleted, and interrupts leave resumable state.
+- **Bounded large-file paths.** TXT, logs, supported code, CSV, and JSONL stream through hashing, parsing, chunking, and batching. Whole-document formats have an explicit 100 MB limit and actionable conversion guidance.
+- **Measured ingestion quality.** A private offline evaluator tracks Hit Rate, Recall@K, Precision@K, MRR, and nDCG without adding a public query API.
+- **Release evidence.** CI exercises Ubuntu, macOS, and Windows and checks the built CLI, circular dependencies, retrieval thresholds, package contents/size, and the 500 ms cold-start budget.
+
+The GitHub `v1.2.0` release contains these changes. npm remains on the prior published version until `v1.2.0` is intentionally published there.
+
 ---
 
 ## Install
@@ -38,6 +50,7 @@ npx @seifkhaled/auto-embed embed ./README.md --local
 npx @seifkhaled/auto-embed init
 npx @seifkhaled/auto-embed embed ./docs/handbook.pdf
 npx @seifkhaled/auto-embed embed "./docs/**/*.md" --collection handbook
+npx @seifkhaled/auto-embed embed ./docs --collection handbook
 ```
 
 The `init` flow asks you to pick an embedding provider, paste a key, pick a vector DB, and paste a connection. The config lives in `~/.auto-embed/config.json` with mode `0600` and is masked on display.
@@ -97,6 +110,7 @@ See [`docs/providers/`](./docs/providers/) and [`docs/vector-dbs/`](./docs/vecto
 | `--force` | off | Ignore the lockfile; re-embed and replace. |
 | `--dry-run` | off | Print the plan + chunk table + USD cost estimate; embed nothing. |
 | `--show-chunks` | off | Write every would-be chunk to a text file; embed nothing. |
+| `--out-vectors <path>` | none | Also atomically write ordered vectors to one JSONL file for inspection. |
 | `--verbose` | off | Debug logging. |
 
 Run `auto-embed embed --help` for the complete list.
@@ -127,6 +141,12 @@ npx @seifkhaled/auto-embed embed ./docs/handbook.pdf --plan plan.json --provider
 # Glob ingestion
 npx @seifkhaled/auto-embed embed "./docs/**/*.md" --collection handbook --concurrency 8
 
+# Recursive directory ingestion
+npx @seifkhaled/auto-embed embed ./docs --collection handbook
+
+# Keep an inspectable local copy of the vectors while upserting
+npx @seifkhaled/auto-embed embed ./docs --local --out-vectors docs-vectors.jsonl
+
 # CI: deterministic, non-interactive
 DATABASE_URL=… npx @seifkhaled/auto-embed embed ./docs/handbook.md \
   --provider openai --db pgvector --collection handbook --yes
@@ -139,6 +159,16 @@ More patterns in [`examples/`](./examples/).
 Pass `--show-chunks` to stop after parsing and chunking. Without `--out`, each input writes a source-specific report named `<filename>-chunks.txt` in the current directory (for example, `handbook.pdf` writes `handbook-chunks.txt`). Pass `--out <path>` to combine multiple inputs into one report. This mode does not initialize an embedding provider, connect to a vector database, write a lockfile, or create any embeddings. Each entry contains the exact chunk text, its deterministic ID, token count, and metadata.
 
 Use `--out <path>.txt` to choose a different output file. When `--out` is provided with multiple input files, their chunks are collected into that report.
+
+### Input expansion and fallback
+
+Input arguments may be explicit files, quoted glob patterns, or directories. Directories recurse through files; results are normalized, de-duplicated, and sorted so shell-expanded and CLI-expanded inputs behave consistently. Default recursive ignores cover `.git`, `node_modules`, `.auto-embed`, `dist`, and `chroma`, and symlinked directories are not traversed. Passing an explicit file bypasses those directory ignores.
+
+If an input or quoted pattern matches nothing, the command exits as a user/config error and prints an actionable hint. Matching the same file through a directory, glob, and explicit argument still processes it only once.
+
+Unknown extensions are inspected before parsing. Text-like content falls back to the recursive text parser with a warning. Binary content and malformed files with a supported extension fail with a parser error.
+
+`--out-vectors <path>` writes one combined JSONL file in resolved input order. Each row contains source path, chunk identity and text, metadata, model, dimensions, and the vector. The file is written through a temporary path and atomically renamed after every input succeeds; it never contains API keys or stored configuration. Because vectors cannot be reconstructed from the lockfile, this explicit inspection mode embeds every chunk even when ingestion is otherwise up to date. If an export run fails, its temporary file is removed and the next export regenerates all vectors so the final JSONL is complete.
 
 ---
 
@@ -193,7 +223,7 @@ auto-embed config path                            # absolute path to the config 
 
 The chunker uses `js-tiktoken` for token counts and a port of LangChain's recursive splitter (no LangChain dependency). Each chunk gets a deterministic ID derived from `sha256(sourcePath + index + chunkerVersion + text)` — same input file + same plan + same model → byte-identical chunk IDs across machines.
 
-A per-file lockfile lives at `./.auto-embed/<hash>.lock.json`. **Commit `.auto-embed/`** to share idempotency state with CI.
+A per-file lockfile lives at `./.auto-embed/<hash>.lock.json`. The directory is ignored by default because it also contains temporary job/evaluation state. Teams that deliberately share idempotency state with CI can force-add only the stable `*.lock.json` files; do not commit incomplete job manifests or local evaluation output.
 
 ### The `EmbedPlan`
 
@@ -204,6 +234,36 @@ The plan is a small JSON document describing how to chunk one file: splitter typ
 - File hash unchanged, plan unchanged, model unchanged → skip, `up to date`, **zero API calls**.
 - File content changed → diff chunk IDs; embed only the new ones; delete the removed ones.
 - Embedding model or dimensions changed → refuse to write (would corrupt the collection with mixed-dim vectors). Use `--force` or pick a fresh `--collection`.
+
+### Crash recovery
+
+In-progress work is recorded atomically under `.auto-embed/jobs/`. Each embedding batch is checkpointed only after its vectors are successfully upserted. If the provider, vector database, process, or final lockfile write fails, run the same command again: already committed chunk IDs are skipped, incomplete batches continue, and old chunk IDs are not deleted until every replacement is safe. The final lockfile is written only after upserts and deletions complete, then the temporary job manifest is removed.
+
+`--force` discards matching checkpoint progress and starts that ingestion again. `SIGINT` and `SIGTERM` stop new provider work, allow active calls to finish, close the vector database, and leave the job manifest ready for a later resume.
+
+### Large-file behavior
+
+File hashing always uses a stream. Real ingestion of TXT, logs, supported code, CSV, and JSONL uses reusable async parser/chunker passes; normal embedding batches are upserted and released instead of retaining every vector. CSV is record-aware, including quoted newlines, and JSONL retains physical line metadata.
+
+Markdown/MDX, PDF, HTML, DOCX, JSON, and content-sniffed formats currently depend on whole-document parser libraries. The CLI rejects those inputs above 100 MB before reading them and suggests splitting or converting to TXT, CSV, or JSONL. Preview/report modes may intentionally retain chunk text to print or export it; the bounded-memory guarantee applies to real ingestion.
+
+The opt-in `bun run perf:large` gate generates 128 MB TXT and JSONL fixtures, streams each hash and chunks each twice, and verifies byte hash plus chunk-ID determinism. The ratified ceiling is 384 MB peak RSS; the 2026-07-31 baseline produced 6,039 TXT chunks and 7,690 JSONL chunks at 326.9 MB peak RSS in 217.34 seconds on the development machine.
+
+### Private retrieval-quality evaluation
+
+`bun run eval` is an engineering gate, not a public query feature. It chunks the versioned corpus under `test/fixtures/eval/` with each manifest strategy, ranks chunks through a deterministic offline TF-IDF/cosine backend, and reports Hit Rate, Recall@K, Precision@K, MRR, and nDCG. Golden labels identify an expected source plus exact supporting phrase; hard negatives intentionally reuse terms such as “rotation.”
+
+The command atomically writes `.auto-embed/eval/evaluation.json` and a self-contained `.auto-embed/eval/evaluation.html`. Repeated runs with the same manifest are byte-identical. Regression thresholds apply to the structural `markdown-800-100` baseline. No evaluator code is included in the published package, and no `query` command or retrieval library API is exposed.
+
+### Release assurance
+
+`bun run quality` runs strict typechecking, the complete test suite, the production build, a circular-dependency scan, built-CLI smoke tests, the offline retrieval gate, and npm archive/cold-start validation. The opt-in `bun run perf:large` adds the generated 128 MB TXT/JSONL memory and determinism gate.
+
+The GitHub Actions matrix covers Node 20 and 22 on Ubuntu plus Node 22 on macOS and Windows. The current v1.2 baseline is 201 passing assertions, no circular dependencies, a 108.2 KB npm archive (460.8 KB unpacked), and a measured maximum cold start of 162.9 ms against a 500 ms budget.
+
+### Product boundary
+
+`auto-embed` ends after vectors are safely written. It does not ship query embedding, top-k retrieval, hybrid fusion, MMR, reranking, HyDE, prompt composition, answer generation, citations, agents, hosted synchronization, web crawling, database-row ingestion, multimodal indexing, or query-time authorization. Use the selected vector database SDK and the serving application for those concerns. The private evaluator performs retrieval only as an engineering measurement and is not included in the npm package.
 
 ---
 

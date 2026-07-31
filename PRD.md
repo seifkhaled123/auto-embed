@@ -78,7 +78,7 @@ Secondary user: someone evaluating RAG for the first time and wanting a zero-fri
 | `.csv` | built-in | One chunk per row, header-aware, configurable text column(s) |
 | Code (`.ts`, `.js`, `.py`, `.go`, `.rs`, `.java`) | built-in | Recursive splitter tuned to language separators (functions, classes) |
 
-Unsupported file types degrade to recursive text splitter with a warning rather than failing.
+Unsupported extensions degrade to the recursive text splitter with a warning when content sniffing confirms a safe text file. Binary or malformed supported formats fail with a parser error rather than being decoded as text.
 
 ### 6.2 Supported vector databases (v1)
 
@@ -122,12 +122,13 @@ When `--plan` is **not** passed, no LLM provider is required to be configured.
   - **File hash changed** → diff chunk IDs, delete removed chunks, upsert new/changed.
   - **Embedding model or dimensions changed** → refuse to write (would corrupt the collection with mixed-dim vectors); require `--force` or `--collection <new-name>`.
 - `--force` ignores the lockfile and replaces all chunks for the file.
+- Each incomplete ingestion has an atomic job manifest under `.auto-embed/jobs/`. A batch is checkpointed only after its vector-store upsert succeeds. Re-running skips committed chunk IDs, delays removal of superseded IDs until all replacement upserts finish, writes the final lockfile, then removes the job manifest. `--force` resets matching job progress. Vector-export runs intentionally restart all chunks to produce a complete atomic JSONL.
 
 ### 6.6 CLI surface (v1)
 
 ```
 auto-embed init                          # interactive setup
-auto-embed embed <files...> [flags]      # the main command
+auto-embed embed <files|globs|dirs...> [flags] # the main command
 auto-embed plan <file>                   # alias for: embed <file> --plan-only
 auto-embed config <get|set|list|path>    # manage stored config
 auto-embed providers                     # list available providers + status of configured keys
@@ -154,7 +155,7 @@ auto-embed --version
 | `--concurrency <n>` | 4 | Parallel embedding requests |
 | `--force` | off | Ignore lockfile; re-embed and replace |
 | `--dry-run` | off | Show what would happen; embed nothing |
-| `--out-vectors <path>` | none | Also write vectors to a local `.jsonl` for inspection |
+| `--out-vectors <path>` | none | Also atomically write ordered vectors to one local `.jsonl`; multiple inputs are combined in resolved path order and every chunk is embedded even when the lockfile is current |
 | `--yes` / `-y` | off | Non-interactive mode |
 | `--verbose` | off | Debug logging |
 
@@ -166,8 +167,8 @@ auto-embed --version
 - Token-aware chunking using `js-tiktoken` (works offline, no API).
 - Batch embedding requests to respect each provider's rate and batch limits.
 - Retry with exponential backoff on transient errors (HTTP 429, 5xx, network).
-- Stream-friendly: handle files > 100 MB without loading the whole thing in memory where the parser allows.
-- Glob support: `auto-embed embed "./docs/**/*.md"`.
+- Stream-friendly: hash every file incrementally; process TXT, logs, supported code, CSV, and JSONL through reusable async section/chunk streams; and handle files > 100 MB without loading source text or completed vectors into memory. Whole-document Markdown/MDX, PDF, HTML, DOCX, JSON, and sniffed-format parsers have a clear 100 MB limit with conversion/splitting guidance.
+- Local input expansion: explicit files, quoted globs, and recursive directory arguments. Resolve to normalized, de-duplicated, lexically sorted files; do not recurse through symlinked directories; ignore `.git`, `node_modules`, `.auto-embed`, `dist`, and `chroma` unless a file is passed explicitly. An unmatched input is a user/config error.
 - Pretty progress UI (`@clack/prompts` + `ora`) matching auto-seed's look.
 - Non-interactive mode triggered by `--yes` or by detecting non-TTY stdin.
 - Mask API keys in all logs and error output.
@@ -176,7 +177,7 @@ auto-embed --version
 
 ### 7.2 Should
 
-- Auto-detect file type by extension first, then by content sniffing as a fallback.
+- Auto-detect file type by extension first, then by content sniffing. Unknown text-like files fall back to recursive text with a warning; unknown binary files fail clearly.
 - Print a one-line ingestion summary (`Embedded 142 chunks from handbook.pdf into pinecone://my-index/handbook in 4.2s, cost ~$0.0023`).
 - Cost estimator: dry-run reports approximate USD cost based on token count and provider pricing.
 - Warn loudly on collection/model dimension mismatch before making any API call.

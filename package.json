@@ -1,6 +1,6 @@
 {
   "name": "@seifkhaled/auto-embed",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Zero-config CLI that ingests files into vector databases for RAG projects. Parse, chunk, embed, upsert — one command.",
   "type": "module",
   "bin": {
@@ -28,11 +28,17 @@
   },
   "scripts": {
     "build": "tsup",
+    "deps:check": "madge --circular --extensions ts src/index.ts",
     "dev": "tsx src/index.ts",
+    "eval": "tsx test/eval/run.ts",
+    "perf:large": "tsx test/perf-large.ts",
+    "release:check": "node test/release-check.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:cli": "bun run build && node test/cli-smoke.mjs",
     "test:watch": "vitest",
-    "prepublishOnly": "bun run typecheck && bun run test && bun run build"
+    "quality": "bun run typecheck && bun run test && bun run build && bun run deps:check && node test/cli-smoke.mjs && bun run eval && bun run release:check",
+    "prepublishOnly": "bun run quality"
   },
   "keywords": [
     "rag",
@@ -63,6 +69,7 @@
     "pg": "^8.21.0",
     "picocolors": "^1.1.0",
     "remark-parse": "^11.0.0",
+    "tinyglobby": "^0.2.14",
     "unified": "^11.0.5",
     "unpdf": "^1.6.2",
     "zod": "^3.25.76"

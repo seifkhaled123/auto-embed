@@ -1,7 +1,7 @@
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   diffChunks,
   hashFile,
@@ -66,6 +66,18 @@ describe("hashFile", () => {
     const file = path.join(tmp, "x.txt");
     await fsp.writeFile(file, "hello world");
     expect(await hashFile(file)).toBe(await hashFile(file));
+  });
+
+  it("streams content instead of calling readFile", async () => {
+    const file = path.join(tmp, "streamed.txt");
+    await fsp.writeFile(file, "stream me");
+    const readFile = vi.spyOn(fsp, "readFile");
+    try {
+      await expect(hashFile(file)).resolves.toMatch(/^[a-f0-9]{64}$/);
+      expect(readFile).not.toHaveBeenCalled();
+    } finally {
+      readFile.mockRestore();
+    }
   });
 
   it("changes when the file content changes", async () => {

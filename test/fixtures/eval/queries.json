@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "queries": [
+    {
+      "id": "canary-percentage",
+      "text": "What percentage is the production canary rollout?",
+      "relevant": [{ "source": "deployments.md", "contains": "five percent canary" }]
+    },
+    {
+      "id": "rollback-threshold",
+      "text": "Which error rate triggers automatic canary rollback?",
+      "relevant": [{ "source": "deployments.md", "contains": "error rate exceeds two percent" }]
+    },
+    {
+      "id": "sev-one-status",
+      "text": "How quickly must the public status channel open for a SEV-1 incident?",
+      "relevant": [{ "source": "incidents.md", "contains": "within ten minutes" }]
+    },
+    {
+      "id": "payments-rto",
+      "text": "What is the payments service recovery time objective?",
+      "relevant": [{ "source": "incidents.md", "contains": "recovery time objective of thirty minutes" }]
+    },
+    {
+      "id": "node-version",
+      "text": "Which Node.js version is required for command-line projects?",
+      "relevant": [{ "source": "onboarding.md", "contains": "Node.js 20 or newer" }]
+    },
+    {
+      "id": "integration-opt-in",
+      "text": "Which environment flag enables real integration tests?",
+      "relevant": [{ "source": "onboarding.md", "contains": "INTEGRATION=1" }]
+    },
+    {
+      "id": "key-rotation",
+      "text": "How often do production API keys rotate?",
+      "relevant": [{ "source": "security.md", "contains": "every ninety days" }]
+    },
+    {
+      "id": "secret-logging",
+      "text": "Which credentials must never appear in diagnostic logs?",
+      "relevant": [{ "source": "security.md", "contains": "Never log an API key" }]
+    }
+  ]
+}

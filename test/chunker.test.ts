@@ -33,7 +33,7 @@ describe("chunkId determinism", () => {
   });
 
   it("uses CHUNKER_VERSION in the hash", () => {
-    expect(CHUNKER_VERSION).toBe("1");
+    expect(CHUNKER_VERSION).toBe("2");
   });
 });
 

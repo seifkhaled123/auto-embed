@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { embedChunks } from "../src/embed/engine.js";
+import { embedChunks, embedChunkStream } from "../src/embed/engine.js";
 import { Chunk } from "../src/chunker/index.js";
 import { EmbeddingProvider } from "../src/providers/index.js";
 
@@ -56,6 +56,25 @@ describe("embedChunks", () => {
     const out = await embedChunks([], provider, { model: "m" });
     expect(out).toEqual([]);
     expect(calls).toEqual([]);
+  });
+
+  it("streams committed batches without retaining vectors when collect is false", async () => {
+    const chunks = fakeChunks(9);
+    const { provider } = fakeProvider({ defaultBatchSize: 2 });
+    const committed: string[] = [];
+    async function* source() {
+      for (const chunk of chunks) yield chunk;
+    }
+    const out = await embedChunkStream(source(), provider, {
+      model: "m",
+      collect: false,
+      totalChunks: chunks.length,
+      onBatch: async (rows) => {
+        committed.push(...rows.map((row) => row.id));
+      },
+    });
+    expect(out).toEqual([]);
+    expect(committed).toHaveLength(chunks.length);
   });
 
   it("retries on retryable errors", async () => {
@@ -120,6 +139,66 @@ describe("embedChunks", () => {
     for (let i = 1; i < calls.length; i++) {
       expect(calls[i]).toBeGreaterThanOrEqual(calls[i - 1]!);
     }
+  });
+
+  it("commits each validated batch before reporting progress", async () => {
+    const chunks = fakeChunks(5);
+    const { provider } = fakeProvider({ defaultBatchSize: 2 });
+    const events: string[] = [];
+    const onBatch = vi.fn(async (rows: readonly { id: string }[]) => {
+      events.push(`batch:${rows.map((row) => row.id).join(",")}`);
+    });
+    const onProgress = vi.fn((done: number) => events.push(`progress:${done}`));
+
+    await embedChunks(chunks, provider, {
+      model: "m",
+      concurrency: 1,
+      onBatch,
+      onProgress,
+    });
+
+    expect(onBatch).toHaveBeenCalledTimes(3);
+    expect(events).toEqual([
+      expect.stringMatching(/^batch:/),
+      "progress:2",
+      expect.stringMatching(/^batch:/),
+      "progress:4",
+      expect.stringMatching(/^batch:/),
+      "progress:5",
+    ]);
+  });
+
+  it("does not start provider work when already interrupted", async () => {
+    const chunks = fakeChunks(2);
+    const { provider, calls } = fakeProvider();
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      embedChunks(chunks, provider, { model: "m", signal: controller.signal }),
+    ).rejects.toThrow(/interrupted/i);
+    expect(calls).toEqual([]);
+  });
+
+  it("does not commit a batch if interrupted while its provider call is in flight", async () => {
+    const chunks = fakeChunks(2);
+    const controller = new AbortController();
+    const { provider } = fakeProvider({
+      embed: async (texts) => {
+        controller.abort();
+        return texts.map(() => [1, 2, 3]);
+      },
+    });
+    const onBatch = vi.fn(async () => undefined);
+
+    await expect(
+      embedChunks(chunks, provider, {
+        model: "m",
+        signal: controller.signal,
+        onBatch,
+      }),
+    ).rejects.toThrow(/interrupted/i);
+    expect(onBatch).not.toHaveBeenCalled();
   });
 
   it("rejects when provider returns wrong number of vectors", async () => {

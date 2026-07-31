@@ -23,6 +23,8 @@ import {
   defaultChunksReportPath,
   writeChunksReport,
 } from "./chunks-report.js";
+import { expandInputArgs } from "./inputs.js";
+import { createVectorExportWriter } from "./vector-export.js";
 
 interface EmbedOpts {
   collection?: string;
@@ -43,13 +45,14 @@ interface EmbedOpts {
   force?: boolean;
   dryRun?: boolean;
   showChunks?: boolean;
+  outVectors?: string;
   yes?: boolean;
 }
 
 export function buildEmbedCommand(): Command {
   return new Command("embed")
     .description("Parse, chunk, embed, and upsert one or more files into a vector DB")
-    .argument("<files...>", "files or globs to ingest")
+    .argument("<files...>", "files, globs, or directories to ingest")
     .option("--collection <name>", "vector-DB collection / index / table name")
     .option("--provider <name>", "openai | google | voyage | cohere | local")
     .option("--model <id>", "embedding model override")
@@ -70,33 +73,95 @@ export function buildEmbedCommand(): Command {
     .option("--force", "ignore lockfile; re-embed and replace")
     .option("--dry-run", "show what would happen; embed nothing")
     .option("--show-chunks", "write all would-be chunks to a .txt file; embed nothing")
-    .option("--out-vectors <path>", "also write vectors to a local .jsonl")
+    .option("--out-vectors <path>", "also atomically write all vectors to one .jsonl")
     .option("-y, --yes", "non-interactive mode")
-    .action(async (files: string[], opts: EmbedOpts) => {
-      assertPreviewMode(opts);
-      if (opts.planOnly) {
-        for (const file of files) await runPlanOnly(file, opts);
-        return;
-      }
-      if (opts.showChunks) {
-        await runShowChunks(files, opts);
-        return;
-      }
-      if (opts.dryRun) {
-        for (const file of files) await runDryRun(file, opts);
-        return;
-      }
-      for (const file of files) await runReal(file, opts);
-    });
+    .action(async (inputArgs: string[], opts: EmbedOpts) =>
+      withInterruptSignal(async (signal) => {
+        assertPreviewMode(opts);
+        const files = await expandInputArgs(inputArgs);
+        if (opts.planOnly) {
+          for (const file of files) await runPlanOnly(file, opts);
+          return;
+        }
+        if (opts.showChunks) {
+          await runShowChunks(files, opts);
+          return;
+        }
+        if (opts.dryRun) {
+          for (const file of files) await runDryRun(file, opts);
+          return;
+        }
+        if (opts.outVectors) {
+          await runWithVectorExport(files, opts, signal);
+          return;
+        }
+        for (const file of files) await runReal(file, opts, undefined, signal);
+      }),
+    );
+}
+
+async function withInterruptSignal<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  let interrupted = false;
+  const onInterrupt = () => {
+    if (interrupted) return;
+    interrupted = true;
+    log.warn("interrupt received; finishing active provider work before cleanup…");
+    controller.abort();
+  };
+  process.once("SIGINT", onInterrupt);
+  process.once("SIGTERM", onInterrupt);
+  try {
+    return await run(controller.signal);
+  } finally {
+    process.removeListener("SIGINT", onInterrupt);
+    process.removeListener("SIGTERM", onInterrupt);
+  }
 }
 
 function assertPreviewMode(opts: EmbedOpts): void {
   const selected = [opts.planOnly, opts.dryRun, opts.showChunks].filter(Boolean);
-  if (selected.length <= 1) return;
-  throw new AutoEmbedError(
-    "Choose only one of --plan-only, --dry-run, or --show-chunks.",
-    ExitCode.UserConfig,
-  );
+  if (selected.length > 1) {
+    throw new AutoEmbedError(
+      "Choose only one of --plan-only, --dry-run, or --show-chunks.",
+      ExitCode.UserConfig,
+    );
+  }
+  if (opts.outVectors && selected.length > 0) {
+    throw new AutoEmbedError(
+      "--out-vectors cannot be combined with a preview-only mode.",
+      ExitCode.UserConfig,
+      "Remove --plan-only, --dry-run, or --show-chunks to generate vectors.",
+    );
+  }
+}
+
+async function runWithVectorExport(
+  files: string[],
+  opts: EmbedOpts,
+  signal: AbortSignal,
+): Promise<void> {
+  const outputPath = path.resolve(opts.outVectors!);
+  if (files.includes(outputPath)) {
+    throw new AutoEmbedError(
+      `Vector export would overwrite an input file: ${outputPath}`,
+      ExitCode.UserConfig,
+      "Choose a different --out-vectors path.",
+    );
+  }
+
+  const writer = await createVectorExportWriter(outputPath);
+  try {
+    log.info(pc.dim("vector export requested; embedding every chunk in resolved input order…"));
+    for (const file of files) {
+      await runReal(file, opts, (rows) => writer.append(file, rows), signal);
+    }
+    const committed = await writer.commit();
+    log.success(`wrote vectors to ${pc.cyan(committed)}`);
+  } catch (err) {
+    await writer.abort();
+    throw err;
+  }
 }
 
 function applyLocalShortcut(opts: EmbedOpts): EmbedOpts {
@@ -179,7 +244,12 @@ function resolveModelFromConfig(
   return { provider, model };
 }
 
-async function runReal(file: string, rawOpts: EmbedOpts): Promise<void> {
+async function runReal(
+  file: string,
+  rawOpts: EmbedOpts,
+  captureVectors?: Parameters<typeof runPipeline>[0]["captureVectors"],
+  signal?: AbortSignal,
+): Promise<void> {
   const opts = applyLocalShortcut(rawOpts);
   const cfg = await loadConfig();
   const { provider, model } = resolveModelFromConfig(opts, cfg);
@@ -209,6 +279,8 @@ async function runReal(file: string, rawOpts: EmbedOpts): Promise<void> {
       batchSize: opts.batchSize,
       concurrency: opts.concurrency,
     },
+    captureVectors,
+    signal,
   });
 
   printOutcome(outcome);

@@ -19,6 +19,13 @@ export interface ParsedDocument {
   sections: ParsedSection[];
 }
 
+export interface ParsedSource {
+  sourcePath: string;
+  contentType: ContentType;
+  mode: "sections" | "stream-text";
+  sections(): AsyncIterable<ParsedSection>;
+}
+
 export interface Parser {
   parse(sourcePath: string): Promise<ParsedDocument>;
 }

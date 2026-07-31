@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "name": "auto-embed structural chunking baseline",
+  "backend": "lexical-tfidf-cosine-v1",
+  "corpusDir": "corpus",
+  "queriesFile": "queries.json",
+  "topK": 3,
+  "baselineExperiment": "markdown-800-100",
+  "experiments": [
+    { "id": "markdown-800-100", "splitter": "markdown", "chunkSize": 800, "overlap": 100 },
+    { "id": "markdown-160-24", "splitter": "markdown", "chunkSize": 160, "overlap": 24 },
+    { "id": "recursive-256-32", "splitter": "recursive", "chunkSize": 256, "overlap": 32 }
+  ],
+  "thresholds": {
+    "hitRate": 0.99,
+    "recall": 0.99,
+    "precision": 0.33,
+    "mrr": 0.99,
+    "ndcg": 0.99
+  }
+}

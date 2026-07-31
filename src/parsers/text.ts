@@ -106,7 +106,7 @@ const CODE_LANG: Record<string, string> = {
 export async function parseCode(sourcePath: string): Promise<ParsedDocument> {
   const text = await readFile(sourcePath);
   const ext = path.extname(sourcePath).toLowerCase();
-  const language = CODE_LANG[ext] ?? "unknown";
+  const language = codeLanguageForPath(sourcePath);
   return {
     sourcePath,
     contentType: "code",
@@ -131,11 +131,15 @@ async function readFile(sourcePath: string): Promise<string> {
   }
 }
 
-function stringifyValue(value: unknown): string {
+export function stringifyValue(value: unknown): string {
   if (typeof value === "string") return value;
   if (value === null || value === undefined) return "";
   if (typeof value === "object") return JSON.stringify(value, null, 2);
   return String(value);
+}
+
+export function codeLanguageForPath(sourcePath: string): string {
+  return CODE_LANG[path.extname(sourcePath).toLowerCase()] ?? "unknown";
 }
 
 /**

@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Approval-ready execution plan translating the auto-embed RAG landscape gap report into scoped implementation work.">
+  <title>auto-embed — Landscape Gap Execution Plan</title>
+  <style>
+    :root {
+      --paper: #f1eee5;
+      --paper-2: #e7e1d4;
+      --ink: #171815;
+      --muted: #60625d;
+      --rule: #2d302b;
+      --signal: #ee4a2b;
+      --signal-dark: #a72c17;
+      --lime: #c7f36b;
+      --blue: #22627b;
+      --blue-soft: #d9e8e9;
+      --amber: #f1bd55;
+      --white: #fffdf7;
+      --shadow: 8px 8px 0 #171815;
+      --display: "Bodoni 72", Didot, "Bodoni MT", Georgia, serif;
+      --body: "Avenir Next", Avenir, "Trebuchet MS", sans-serif;
+      --condensed: "Avenir Next Condensed", "Franklin Gothic Medium", "Arial Narrow", sans-serif;
+      --mono: "IBM Plex Mono", "Courier New", monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(23, 24, 21, .045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(23, 24, 21, .045) 1px, transparent 1px),
+        var(--paper);
+      background-size: 28px 28px;
+      font: 1rem/1.65 var(--body);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .16;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E");
+      z-index: 20;
+    }
+
+    a { color: inherit; }
+    button, input { font: inherit; }
+    code { font: .88em/1.45 var(--mono); }
+    ::selection { color: var(--ink); background: var(--lime); }
+
+    .skip {
+      position: fixed;
+      left: 1rem;
+      top: -5rem;
+      z-index: 100;
+      padding: .65rem 1rem;
+      background: var(--ink);
+      color: var(--white);
+    }
+    .skip:focus { top: 1rem; }
+
+    .rail {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      min-height: 56px;
+      padding: .65rem clamp(1rem, 3vw, 3rem);
+      color: var(--white);
+      background: var(--ink);
+      border-bottom: 4px solid var(--signal);
+    }
+    .rail-brand {
+      font: 800 .78rem/1 var(--mono);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .rail nav { display: flex; gap: 1.15rem; }
+    .rail nav a {
+      color: #d9d7cd;
+      font: 800 .72rem/1 var(--condensed);
+      letter-spacing: .08em;
+      text-decoration: none;
+      text-transform: uppercase;
+    }
+    .rail nav a:hover, .rail nav a:focus { color: var(--lime); }
+    .rail button {
+      padding: .5rem .75rem;
+      border: 1px solid var(--white);
+      color: var(--white);
+      background: transparent;
+      cursor: pointer;
+      font: 800 .7rem/1 var(--mono);
+      text-transform: uppercase;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      min-height: 610px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(260px, .5fr);
+      gap: 3rem;
+      align-items: end;
+      padding: clamp(4rem, 10vw, 8rem) clamp(1.25rem, 7vw, 7rem) clamp(3rem, 8vw, 6rem);
+      color: var(--white);
+      background: var(--blue);
+      border-bottom: 12px solid var(--ink);
+    }
+    .hero::before {
+      content: "EXECUTE";
+      position: absolute;
+      right: -2rem;
+      top: .1em;
+      color: rgba(255, 255, 255, .07);
+      font: 900 clamp(7rem, 22vw, 22rem)/.8 var(--condensed);
+      letter-spacing: -.08em;
+      transform: rotate(-4deg);
+    }
+    .hero-copy, .hero-card { position: relative; z-index: 1; }
+    .eyebrow, .kicker {
+      margin: 0 0 1rem;
+      font: 900 .74rem/1.3 var(--mono);
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    .hero h1 {
+      max-width: 13ch;
+      margin: 0;
+      font: 400 clamp(4rem, 9vw, 9rem)/.78 var(--display);
+      letter-spacing: -.055em;
+    }
+    .hero h1 em { color: var(--lime); font-style: italic; }
+    .hero .lede {
+      max-width: 60ch;
+      margin: 2rem 0 0;
+      font-size: clamp(1rem, 1.5vw, 1.25rem);
+      line-height: 1.55;
+    }
+    .hero-card {
+      padding: 1.25rem;
+      color: var(--ink);
+      background: var(--lime);
+      border: 3px solid var(--ink);
+      box-shadow: var(--shadow);
+      transform: rotate(1.5deg);
+    }
+    .hero-card strong {
+      display: block;
+      overflow-wrap: anywhere;
+      font: 900 clamp(2.4rem, 3.7vw, 3.7rem)/.86 var(--condensed);
+      letter-spacing: -.04em;
+      text-transform: uppercase;
+    }
+    .hero-card p { margin: 1rem 0 0; font-weight: 700; line-height: 1.4; }
+
+    .wrap { width: min(1180px, calc(100% - 2rem)); margin: 0 auto; }
+    .section { padding: clamp(4rem, 8vw, 7.5rem) 0; border-bottom: 2px solid var(--rule); }
+    .section-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, .75fr);
+      gap: 3rem;
+      align-items: end;
+      margin-bottom: 3rem;
+    }
+    .section h2 {
+      margin: 0;
+      font: 500 clamp(3rem, 6vw, 6rem)/.9 var(--display);
+      letter-spacing: -.045em;
+    }
+    .section-intro { margin: 0; color: var(--muted); font-size: 1.08rem; }
+    .kicker { color: var(--signal-dark); }
+
+    .baseline {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border: 3px solid var(--ink);
+      background: var(--white);
+      box-shadow: var(--shadow);
+    }
+    .baseline article { min-height: 175px; padding: 1.35rem; border-right: 2px solid var(--ink); }
+    .baseline article:last-child { border: 0; }
+    .baseline b { display: block; margin-bottom: .45rem; font: 900 2.8rem/1 var(--condensed); }
+    .baseline span { font: 800 .72rem/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .baseline p { margin: 1rem 0 0; color: var(--muted); font-size: .92rem; }
+
+    .boundary {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      border: 3px solid var(--ink);
+      background: var(--white);
+    }
+    .boundary-panel { padding: clamp(1.5rem, 4vw, 3.5rem); }
+    .boundary-panel:first-child { border-right: 3px solid var(--ink); }
+    .boundary-panel.go { background: var(--lime); }
+    .boundary-panel.stop { color: var(--white); background: var(--ink); }
+    .boundary-panel h3 { margin: 0 0 1rem; font: 900 2rem/1 var(--condensed); text-transform: uppercase; }
+    .boundary-panel p { max-width: 47ch; margin: 0; }
+    .boundary-panel ul { margin: 1.5rem 0 0; padding-left: 1.2rem; }
+    .boundary-panel li { margin: .65rem 0; }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .7rem;
+      margin-bottom: 1.5rem;
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      padding: .38rem .62rem;
+      border: 1px solid var(--ink);
+      font: 900 .68rem/1 var(--mono);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .tag::before { content: ""; width: .55rem; height: .55rem; border-radius: 50%; background: currentColor; }
+    .tag.execute { color: var(--signal-dark); background: #ffdcd2; }
+    .tag.defer { color: #6f4a00; background: #fff0c8; }
+    .tag.exclude { color: var(--white); background: var(--ink); }
+
+    .scope-table-wrap { overflow-x: auto; border: 3px solid var(--ink); box-shadow: var(--shadow); }
+    table { width: 100%; border-collapse: collapse; background: var(--white); }
+    th, td { padding: 1rem; text-align: left; vertical-align: top; border-bottom: 1px solid #aaa99f; }
+    th {
+      color: var(--white);
+      background: var(--ink);
+      font: 900 .69rem/1.2 var(--mono);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    td:first-child { width: 19%; font-weight: 900; }
+    td:nth-child(2) { width: 15%; }
+    tr:last-child td { border-bottom: 0; }
+    .status {
+      display: inline-block;
+      padding: .33rem .5rem;
+      border: 1px solid var(--ink);
+      font: 900 .66rem/1 var(--mono);
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .status.execute { background: var(--lime); }
+    .status.defer { background: var(--amber); }
+    .status.exclude { color: var(--white); background: var(--ink); }
+
+    .sequence { position: relative; display: grid; gap: 2rem; }
+    .sequence::before {
+      content: "";
+      position: absolute;
+      left: 35px;
+      top: 1.5rem;
+      bottom: 1.5rem;
+      width: 4px;
+      background: var(--signal);
+    }
+    .phase {
+      position: relative;
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr);
+      gap: 1.5rem;
+      align-items: start;
+    }
+    .phase-index {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      width: 72px;
+      height: 72px;
+      color: var(--white);
+      background: var(--signal);
+      border: 3px solid var(--ink);
+      font: 900 1.55rem/1 var(--mono);
+    }
+    .phase-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(260px, .75fr);
+      gap: 2rem;
+      padding: clamp(1.4rem, 3vw, 2.4rem);
+      background: var(--white);
+      border: 3px solid var(--ink);
+      box-shadow: 5px 5px 0 var(--ink);
+    }
+    .phase-card h3 { margin: 0; font: 900 clamp(1.7rem, 3vw, 2.7rem)/1 var(--condensed); text-transform: uppercase; }
+    .phase-card .intent { margin: .65rem 0 1.2rem; color: var(--muted); }
+    .phase-card ul { margin: 0; padding-left: 1.2rem; }
+    .phase-card li { margin: .55rem 0; }
+    .gate {
+      padding: 1.15rem;
+      background: var(--blue-soft);
+      border-left: 6px solid var(--blue);
+    }
+    .gate b { display: block; margin-bottom: .55rem; font: 900 .74rem/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .gate p { margin: 0; font-size: .92rem; }
+    .phase-command { display: block; margin-top: .75rem; padding: .7rem; overflow-x: auto; background: var(--ink); color: var(--lime); }
+
+    .decisions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.2rem; }
+    .decision {
+      position: relative;
+      padding: 1.35rem 1.35rem 1.35rem 3.6rem;
+      background: var(--white);
+      border: 2px solid var(--ink);
+    }
+    .decision input { position: absolute; left: 1.25rem; top: 1.45rem; width: 1.15rem; height: 1.15rem; accent-color: var(--signal); }
+    .decision h3 { margin: 0; font: 900 1rem/1.25 var(--mono); }
+    .decision p { margin: .65rem 0 0; color: var(--muted); font-size: .93rem; }
+    .decision small { display: block; margin-top: .75rem; font: 800 .68rem/1.35 var(--mono); text-transform: uppercase; }
+
+    .exclude-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .exclude-card { min-height: 210px; padding: 1.4rem; color: var(--white); background: var(--ink); border-top: 7px solid var(--signal); }
+    .exclude-card h3 { margin: 0; font: 900 1.25rem/1.1 var(--condensed); text-transform: uppercase; }
+    .exclude-card p { margin: .8rem 0 0; color: #cdcdc6; font-size: .92rem; }
+    .exclude-card b { color: var(--lime); }
+
+    .approval {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 0;
+      border: 4px solid var(--ink);
+      box-shadow: var(--shadow);
+    }
+    .approval > div { padding: clamp(1.5rem, 4vw, 3.5rem); }
+    .approval-copy { background: var(--amber); }
+    .approval-copy h2 { max-width: 9ch; }
+    .approval-copy p { max-width: 52ch; }
+    .approval-box { color: var(--white); background: var(--blue); }
+    .approval-box h3 { margin: 0 0 1rem; font: 900 1.5rem/1 var(--condensed); text-transform: uppercase; }
+    .approval-box ol { margin: 0; padding-left: 1.2rem; }
+    .approval-box li { margin: .75rem 0; }
+    .approval-note { margin-top: 1.2rem; padding: .9rem; color: var(--ink); background: var(--white); font: 800 .78rem/1.45 var(--mono); }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 2rem clamp(1rem, 4vw, 4rem);
+      color: #d3d2ca;
+      background: var(--ink);
+      font: 700 .7rem/1.4 var(--mono);
+      text-transform: uppercase;
+    }
+
+    .reveal { opacity: 1; transform: none; }
+    .reveal.visible { animation: lift-in .45s ease both; }
+    @keyframes lift-in {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    @media (max-width: 920px) {
+      .rail nav { display: none; }
+      .hero, .section-head, .boundary, .approval { grid-template-columns: 1fr; }
+      .hero { min-height: auto; }
+      .hero-card { max-width: 420px; }
+      .baseline { grid-template-columns: repeat(2, 1fr); }
+      .baseline article:nth-child(2) { border-right: 0; }
+      .baseline article:nth-child(-n+2) { border-bottom: 2px solid var(--ink); }
+      .boundary-panel:first-child { border-right: 0; border-bottom: 3px solid var(--ink); }
+      .phase-card { grid-template-columns: 1fr; }
+      .exclude-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 620px) {
+      .rail-brand { white-space: normal; }
+      .hero h1 { font-size: 3.8rem; }
+      .baseline, .decisions, .exclude-grid { grid-template-columns: 1fr; }
+      .baseline article { border-right: 0; border-bottom: 2px solid var(--ink); }
+      .phase { grid-template-columns: 52px minmax(0, 1fr); gap: .8rem; }
+      .phase-index { width: 52px; height: 52px; }
+      .sequence::before { left: 24px; }
+      th, td { min-width: 130px; }
+      footer { flex-direction: column; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .reveal, .reveal.visible { opacity: 1; transform: none; animation: none; }
+    }
+
+    @media print {
+      body { background: white; font-size: 9.5pt; }
+      body::before, .rail { display: none; }
+      .hero { min-height: auto; padding: 3rem; color: black; background: white; border: 4px solid black; }
+      .hero::before { display: none; }
+      .hero h1 em { color: black; }
+      .hero-card, .baseline, .scope-table-wrap, .phase-card, .approval { box-shadow: none; }
+      .section { padding: 2.5rem 0; break-inside: avoid; }
+      .reveal { opacity: 1; transform: none; }
+      .exclude-card { color: black; background: #eee; }
+      .exclude-card p { color: black; }
+      .approval-box { color: black; background: #ddd; }
+      .phase-card { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to plan</a>
+
+  <header class="rail">
+    <div class="rail-brand">auto-embed / approval plan / 31 Jul 2026</div>
+    <nav aria-label="Plan sections">
+      <a href="#boundary">Boundary</a>
+      <a href="#scope">Scope</a>
+      <a href="#sequence">Sequence</a>
+      <a href="#decisions">Decisions</a>
+      <a href="#excluded">Excluded</a>
+      <a href="#approval">Approval</a>
+    </nav>
+    <button type="button" onclick="window.print()">Print / PDF</button>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Landscape report → executable work</p>
+        <h1>Deepen the <em>ingestion</em> edge.</h1>
+        <p class="lede">
+          An approval-ready plan for <strong>auto-embed 1.1.1</strong>. It repairs promises already made,
+          makes long and interrupted jobs trustworthy, and creates evidence for future chunking decisions—
+          without turning a focused CLI into an end-to-end RAG framework.
+        </p>
+      </div>
+      <aside class="hero-card" aria-label="Plan recommendation">
+        <strong>4<br>execution<br>releases.</strong>
+        <p>One milestone at a time. Every gate green before the next begins. No implementation starts until this plan is approved.</p>
+      </aside>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div>
+            <p class="kicker">Starting evidence</p>
+            <h2>The kernel is healthy.</h2>
+          </div>
+          <p class="section-intro">
+            The report’s diagnosis is sound, but it audited version 1.1.0. The repository is now 1.1.1;
+            chunk-report output changed, while the four main correctness and reliability flags remain.
+          </p>
+        </div>
+        <div class="baseline reveal">
+          <article><b>162</b><span>Tests passing</span><p>All 15 test files pass on the planning baseline.</p></article>
+          <article><b>✓</b><span>Typecheck</span><p>Strict TypeScript is green before any execution work.</p></article>
+          <article><b>118 KB</b><span>CLI bundle</span><p>The current Node 20 ESM build completes successfully.</p></article>
+          <article><b>4</b><span>Confirmed flags</span><p>Glob mismatch, dead vector export, unsafe failure cleanup, and no durable batch resume.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="boundary">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div>
+            <p class="kicker">Product boundary</p>
+            <h2>Files in. Retrieval-ready data out.</h2>
+          </div>
+          <p class="section-intro">
+            The right competitive position from the landscape report is retained: “the zero-config,
+            production-grade ingestion and indexing CLI for RAG.” Work is admitted only when it improves
+            local-file acquisition, parsing, chunking, embedding, index writes, idempotency, or evidence about those stages.
+          </p>
+        </div>
+        <div class="boundary reveal">
+          <article class="boundary-panel go">
+            <h3>Inside the tool</h3>
+            <p>Deterministic local-file ingestion and the safeguards needed to make it dependable in development and CI.</p>
+            <ul>
+              <li>Resolve local file paths, quoted globs, and directories.</li>
+              <li>Parse supported text-bearing files with safe fallbacks.</li>
+              <li>Chunk, embed, cache job progress, and upsert reliably.</li>
+              <li>Export vectors and preserve source/chunk provenance.</li>
+              <li>Benchmark ingestion choices without exposing a query product.</li>
+            </ul>
+          </article>
+          <article class="boundary-panel stop">
+            <h3>Outside the tool</h3>
+            <p>The online application path remains owned by the user’s vector database SDK, orchestration framework, or a future sibling package.</p>
+            <ul>
+              <li>Query APIs, top-k search, hybrid fusion, and reranking.</li>
+              <li>Prompt construction, citations, answer generation, and chat memory.</li>
+              <li>Agentic routing, GraphRAG, and tool orchestration.</li>
+              <li>Hosted scheduling, worker fleets, dashboards, tenancy, and authorization enforcement.</li>
+              <li>Online answer evaluation and production feedback collection.</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="scope">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div>
+            <p class="kicker">Report triage</p>
+            <h2>Execute, gate, or exclude.</h2>
+          </div>
+          <p class="section-intro">
+            “Missing” does not mean “must build.” The 67-item report backlog is filtered through the current PRD,
+            install-size and cold-start limits, the single-user CLI model, and the strict parse → chunk → embed → upsert layering.
+          </p>
+        </div>
+        <div class="legend reveal" aria-label="Scope legend">
+          <span class="tag execute">Execute in this plan</span>
+          <span class="tag defer">Future decision gate</span>
+          <span class="tag exclude">Outside auto-embed</span>
+        </div>
+        <div class="scope-table-wrap reveal">
+          <table>
+            <thead><tr><th>Capability family</th><th>Decision</th><th>What this plan does</th><th>Reason</th></tr></thead>
+            <tbody>
+              <tr><td>CLI input contract</td><td><span class="status execute">Execute</span></td><td>Real glob and directory expansion, deterministic ordering, deduplication, ignore rules, and empty-match errors.</td><td>Already promised by the CLI/README and required by PRD §7.1.</td></tr>
+              <tr><td>Vector inspection</td><td><span class="status execute">Execute</span></td><td>Wire <code>--out-vectors</code> to an atomic, deterministic JSONL export with documented multi-file behavior.</td><td>The public flag and PRD exist; leaving it dead is contract drift.</td></tr>
+              <tr><td>Parser fallback</td><td><span class="status execute">Execute</span></td><td>Extension first, then safe content sniffing; text-like unknown files fall back with a warning, binary files fail clearly.</td><td>Closes PRD/spec drift without treating arbitrary binaries as UTF-8 text.</td></tr>
+              <tr><td>Crash safety</td><td><span class="status execute">Execute</span></td><td>Batch-level job manifest, resume after committed upserts, atomic state writes, and <code>finally</code>-based resource cleanup.</td><td>Required by partial-failure semantics; prevents paid duplicate work.</td></tr>
+              <tr><td>Large-file bounds</td><td><span class="status execute">Execute</span></td><td>Streaming hashing and bounded TXT/CSV/JSONL paths; explicit size policy for libraries that require whole documents.</td><td>Directly addresses the PRD’s &gt;100 MB requirement where the parser permits streaming.</td></tr>
+              <tr><td>Quality evidence</td><td><span class="status execute">Execute</span></td><td>Private benchmark fixtures, golden relevance labels, IR metrics, parameter sweeps, and a regression report.</td><td>Lets future chunking changes be evidence-led while keeping retrieval out of the public CLI.</td></tr>
+              <tr><td>OCR, layout, tables</td><td><span class="status defer">Gate later</span></td><td>No implementation now. Write a separate option study only after the reliability releases.</td><td>Core to hard-document ingestion, but OCR/multimodal work is explicitly outside the current PRD and may break size/system-dependency constraints.</td></tr>
+              <tr><td>Semantic/contextual chunking</td><td><span class="status defer">Gate later</span></td><td>No new splitter until the benchmark proves a material win on agreed corpora.</td><td>Extra API cost and nondeterminism need evidence and a PRD revision.</td></tr>
+              <tr><td>Sparse indexes and migrations</td><td><span class="status defer">Gate later</span></td><td>Keep as a separate indexing proposal after reliability and quality baselines.</td><td>Potentially valuable at index time, but it expands store contracts and serves a hybrid query layer not currently shipped.</td></tr>
+              <tr><td>More sources/adapters/plugins</td><td><span class="status defer">Gate later</span></td><td>No connectors, formats, providers, stores, or plugin API in this execution.</td><td>Depth is prioritized over breadth; public plugin contracts should follow a stable core.</td></tr>
+              <tr><td>Retrieval → generation</td><td><span class="status exclude">Exclude</span></td><td>No query command, reranker, context packer, prompt, answer, agent, or chat runtime.</td><td>Explicit PRD non-goal and the product boundary recommended by the landscape report.</td></tr>
+              <tr><td>Hosted platform controls</td><td><span class="status exclude">Exclude</span></td><td>No scheduler, CDC service, queues, distributed workers, dashboard, auth, quotas, or online feedback system.</td><td>These require a continuously running multi-user platform, not a zero-config local CLI.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="sequence">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div>
+            <p class="kicker">Execution sequence</p>
+            <h2>Four gated releases.</h2>
+          </div>
+          <p class="section-intro">
+            Work is sequential, matching the repository rule to complete one milestone before starting the next.
+            Each release begins with tests for the promised behavior and ends with typecheck, tests, build, circular-dependency check, and a built-CLI smoke test.
+          </p>
+        </div>
+
+        <div class="sequence">
+          <article class="phase reveal">
+            <div class="phase-index">R1</div>
+            <div class="phase-card">
+              <div>
+                <h3>Contract repair</h3>
+                <p class="intent">Make every advertised local-input and inspection behavior true before widening capability.</p>
+                <ul>
+                  <li>Add a command-layer input resolver for explicit files, quoted globs, and recursive directory arguments; normalize, deduplicate, and sort paths deterministically.</li>
+                  <li>Honor repository-safe default ignores for <code>.git</code>, <code>node_modules</code>, <code>.auto-embed</code>, generated output, and symlink recursion; explicit file arguments still win.</li>
+                  <li>Define unmatched-pattern behavior as one typed user/config error with an actionable hint.</li>
+                  <li>Implement content sniffing and safe text fallback; keep malformed supported formats as parser errors rather than silently treating them as plain text.</li>
+                  <li>Implement <code>--out-vectors</code> as ordered JSONL containing source, chunk ID/text/metadata, model, dimensions, and vector—never credentials or config.</li>
+                  <li>Add built-CLI contract tests for every public input/preview flag and invalid combination; update PRD, PLAN, README, and help text together.</li>
+                </ul>
+              </div>
+              <aside class="gate">
+                <b>Release gate</b>
+                <p>Quoted globs and directories work cross-platform; duplicate matches ingest once; empty matches fail predictably; unknown text falls back with a warning; binary content fails; multi-file vector export is deterministic and atomic.</p>
+                <code class="phase-command">bun run typecheck &amp;&amp; bun run test &amp;&amp; bun run build</code>
+              </aside>
+            </div>
+          </article>
+
+          <article class="phase reveal">
+            <div class="phase-index">R2</div>
+            <div class="phase-card">
+              <div>
+                <h3>Crash-safe ingestion</h3>
+                <p class="intent">Turn idempotency from a final lockfile optimization into durable batch-level recovery.</p>
+                <ul>
+                  <li>Create an atomic JSON job manifest under <code>.auto-embed/jobs/</code>, keyed deterministically by source hash, plan hash, provider/model, database, and collection.</li>
+                  <li>Refactor embedding execution to commit each completed batch to the vector store, then checkpoint its chunk IDs; never checkpoint vectors that were not successfully upserted.</li>
+                  <li>On retry, skip committed batch IDs, process the remainder, apply removals only after all replacement upserts succeed, then atomically write the final lockfile.</li>
+                  <li>Keep incomplete manifests for recovery; remove or mark them complete only after the lockfile commits. <code>--force</code> starts a new deterministic job generation.</li>
+                  <li>Wrap every resolved database lifecycle in <code>try/finally</code>; verify cleanup on dimension failures, provider errors, DB errors, and interrupts.</li>
+                  <li>Add failure-injection tests at embed, upsert, delete, lockfile-write, and close boundaries with zero real provider traffic.</li>
+                </ul>
+              </div>
+              <aside class="gate">
+                <b>Release gate</b>
+                <p>A forced failure after batch N causes the next run to begin at N+1; completed vectors are not paid for twice; removed chunks remain available until replacements are safe; DB close is observed on every exit path.</p>
+                <code class="phase-command">bun run test test/engine.test.ts test/pipeline.test.ts test/lockfile.test.ts</code>
+              </aside>
+            </div>
+          </article>
+
+          <article class="phase reveal">
+            <div class="phase-index">R3</div>
+            <div class="phase-card">
+              <div>
+                <h3>Bounded large-file path</h3>
+                <p class="intent">Meet the &gt;100 MB promise where formats permit streaming, and fail transparently where third-party parsers do not.</p>
+                <ul>
+                  <li>Replace whole-file hashing with <code>createReadStream</code>-based hashing.</li>
+                  <li>Introduce a parser-section async-iterator contract without leaking provider or DB concerns into parser/chunker layers.</li>
+                  <li>Stream line/record-oriented TXT, CSV, JSONL, logs, and code; preserve deterministic section order, chunk IDs, overlap semantics, and metadata.</li>
+                  <li>Feed batches forward without retaining every embedding vector in memory; retain only the chunk identity/metadata required for the lockfile.</li>
+                  <li>Measure Markdown, HTML, DOCX, JSON, and PDF libraries; define documented per-format limits and actionable errors for unavoidable whole-document paths.</li>
+                  <li>Add generated 128 MB smoke fixtures outside git and record peak RSS, wall time, and cleanup behavior in an opt-in performance test.</li>
+                </ul>
+              </div>
+              <aside class="gate">
+                <b>Release gate</b>
+                <p>A generated 128 MB TXT and JSONL corpus completes without <code>readFile</code> in parser/hash paths, preserves repeatable chunk IDs across two runs, and stays below a ratified memory ceiling recorded in CI artifacts.</p>
+                <code class="phase-command">bun run test &amp;&amp; bun run build &amp;&amp; bun run perf:large</code>
+              </aside>
+            </div>
+          </article>
+
+          <article class="phase reveal">
+            <div class="phase-index">R4</div>
+            <div class="phase-card">
+              <div>
+                <h3>Quality evidence &amp; release hardening</h3>
+                <p class="intent">Create a reproducible answer to “did this ingestion change improve retrieval?” without adding retrieval to the product surface.</p>
+                <ul>
+                  <li>Add a private, opt-in benchmark runner under engineering scripts—not a public <code>auto-embed query</code> command.</li>
+                  <li>Version small representative corpora, questions, relevant chunk/source labels, and hard negatives; avoid copyrighted or sensitive data.</li>
+                  <li>Measure Hit Rate, Recall@K, Precision@K, MRR, and nDCG for chunk size, overlap, splitter, model, and parser variants using a documented local evaluation backend.</li>
+                  <li>Save machine-readable experiment manifests and an HTML/JSON comparison report; establish the current structural chunkers as the baseline.</li>
+                  <li>Add regression thresholds only after repeated runs establish stable variance; keep network/provider evaluation opt-in.</li>
+                  <li>Run cross-platform built-CLI smoke tests, package-size/cold-start checks, <code>madge --circular</code>, docs reconciliation, and release notes.</li>
+                </ul>
+              </div>
+              <aside class="gate">
+                <b>Release gate</b>
+                <p>The same manifest reproduces the same corpus/chunk identities and metric report; the baseline is published with limitations; no query, rerank, or generation API appears in the CLI bundle.</p>
+                <code class="phase-command">bun run eval &amp;&amp; bun run typecheck &amp;&amp; bun run test &amp;&amp; bun run build</code>
+              </aside>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="decisions">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div>
+            <p class="kicker">Approval decisions</p>
+            <h2>Defaults to confirm or tweak.</h2>
+          </div>
+          <p class="section-intro">
+            These are the plan’s recommended choices. The checkboxes are a local reading aid only;
+            they persist in this browser and do not modify the source plan or authorize implementation.
+          </p>
+        </div>
+        <div class="decisions reveal">
+          <article class="decision"><input id="d1" type="checkbox" data-decision="d1" checked><div><h3><label for="d1">D1 · Directory arguments are supported</label></h3><p>Directories recurse through supported files with safe ignores; quoted globs behave the same across shells.</p><small>Recommended · R1</small></div></article>
+          <article class="decision"><input id="d2" type="checkbox" data-decision="d2" checked><div><h3><label for="d2">D2 · Keep and implement --out-vectors</label></h3><p>Use one deterministic combined JSONL for expanded multi-file inputs, written through a temporary file and atomic rename.</p><small>Recommended · R1</small></div></article>
+          <article class="decision"><input id="d3" type="checkbox" data-decision="d3" checked><div><h3><label for="d3">D3 · Unknown text falls back; binary does not</label></h3><p>This safely narrows the PRD’s broad fallback promise and prevents silent garbage ingestion.</p><small>Recommended · R1</small></div></article>
+          <article class="decision"><input id="d4" type="checkbox" data-decision="d4" checked><div><h3><label for="d4">D4 · Use atomic JSON job manifests</label></h3><p>Avoid SQLite/native dependencies until scale evidence proves JSON checkpoint contention or durability insufficient.</p><small>Recommended · R2</small></div></article>
+          <article class="decision"><input id="d5" type="checkbox" data-decision="d5" checked><div><h3><label for="d5">D5 · Ratify memory ceiling after measurement</label></h3><p>The release gate requires a recorded ceiling; the initial spike determines a realistic cross-platform number instead of guessing one.</p><small>Recommended · R3</small></div></article>
+          <article class="decision"><input id="d6" type="checkbox" data-decision="d6" checked><div><h3><label for="d6">D6 · Evaluation stays private</label></h3><p>The benchmark may perform retrieval internally, but no public query or library API ships from auto-embed.</p><small>Recommended · R4</small></div></article>
+          <article class="decision"><input id="d7" type="checkbox" data-decision="d7" checked><div><h3><label for="d7">D7 · No semantic splitter before evidence</label></h3><p>Structural chunking remains the default and only shipped family until corpus metrics justify cost and determinism tradeoffs.</p><small>Recommended · post-R4 gate</small></div></article>
+          <article class="decision"><input id="d8" type="checkbox" data-decision="d8" checked><div><h3><label for="d8">D8 · Update specs before implementation</label></h3><p>Approval first changes PRD/PLAN/README decisions, then code. This prevents another round of contract drift.</p><small>Required by project conventions</small></div></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="excluded">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div>
+            <p class="kicker">Hard exclusions</p>
+            <h2>Not in this tool.</h2>
+          </div>
+          <p class="section-intro">
+            These report gaps are real capabilities in a complete RAG system, but they are not deficiencies
+            auto-embed should absorb. Some may become a sibling package; others belong to application code or managed infrastructure.
+          </p>
+        </div>
+        <div class="exclude-grid reveal">
+          <article class="exclude-card"><h3>Retrieval runtime</h3><p>No query embedding, top-k, filters, hybrid fusion, MMR, rewrites, HyDE, routing, parent expansion, or GraphRAG. <b>Use the vector DB SDK or a separate retrieval package.</b></p></article>
+          <article class="exclude-card"><h3>Rerank &amp; compose</h3><p>No cross-encoders, context compression, prompt-budget packing, snippet selection, or citation rendering. <b>These are query-time concerns.</b></p></article>
+          <article class="exclude-card"><h3>Generation &amp; agents</h3><p>No grounded-answer runtime, prompt registry, structured answers, chat memory, agent loops, or tool routing. <b>auto-embed produces an index; it does not answer.</b></p></article>
+          <article class="exclude-card"><h3>Hosted synchronization</h3><p>No cron service, filesystem watcher, webhooks, CDC, remote cursors, durable queues, worker fleet, or control dashboard. <b>The CLI remains one-shot and CI-friendly.</b></p></article>
+          <article class="exclude-card"><h3>Authorization enforcement</h3><p>Future ingestion may preserve ACL-like metadata, but this tool cannot guarantee query-time authorization, tenant isolation, quotas, or audit access. <b>Enforcement lives in the serving layer.</b></p></article>
+          <article class="exclude-card"><h3>Online evaluation</h3><p>No answer judges, production traces across an LLM app, thumbs feedback, failed-search queues, or citation-click analytics. <b>R4 evaluates offline ingestion choices only.</b></p></article>
+          <article class="exclude-card"><h3>Database-row ingestion</h3><p>No SQL, MongoDB, Snowflake, Kafka, REST, GraphQL, or stream records. <b>The PRD reserves this for a future <code>auto-embed db</code> concept.</b></p></article>
+          <article class="exclude-card"><h3>Web crawling</h3><p>No URL loader, sitemap, RSS, recursive crawler, or browser automation. <b>Current scope remains local files; downloaded HTML is supported.</b></p></article>
+          <article class="exclude-card"><h3>Multimodal indexing</h3><p>No image, audio, video, page-image, ColPali, ColBERT, or VLM vector path. <b>The current provider/store contracts remain dense text vectors.</b></p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="approval">
+      <div class="wrap">
+        <div class="approval reveal">
+          <div class="approval-copy">
+            <p class="kicker">Approval gate</p>
+            <h2>Review. Tweak. Then execute.</h2>
+            <p>
+              Approval authorizes only R1 first. R2 starts after R1 acceptance is green; the same rule applies to R3 and R4.
+              Deferred items require a new PRD decision and a separate plan, even if they appear in the landscape report as P0 or P1.
+            </p>
+          </div>
+          <div class="approval-box">
+            <h3>Before approval</h3>
+            <ol>
+              <li>Confirm the six product choices and two process choices above.</li>
+              <li>Edit this source file if wording, sequencing, or scope should change.</li>
+              <li>Confirm that R1’s public behavior is the desired contract.</li>
+              <li>Explicitly approve the plan; implementation then begins at R1 tests/specs.</li>
+            </ol>
+            <div class="approval-note">Source: docs/rag-landscape-execution-plan.html<br>Basis: docs/rag-landscape-gap-report.html + CLAUDE.md + PRD.md + PLAN.md + repository audit at v1.1.1</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>auto-embed · landscape gap execution plan · 31 July 2026</span>
+    <span>Self-contained HTML · approval does not occur inside this page</span>
+  </footer>
+
+  <script>
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reveals = document.querySelectorAll('.reveal');
+    if (reducedMotion || !('IntersectionObserver' in window)) {
+      reveals.forEach((item) => item.classList.add('visible'));
+    } else {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: .08 });
+      reveals.forEach((item) => observer.observe(item));
+    }
+
+    document.querySelectorAll('[data-decision]').forEach((input) => {
+      const key = `auto-embed-plan-${input.dataset.decision}`;
+      const saved = localStorage.getItem(key);
+      if (saved !== null) input.checked = saved === 'true';
+      input.addEventListener('change', () => localStorage.setItem(key, String(input.checked)));
+    });
+  </script>
+</body>
+</html>
