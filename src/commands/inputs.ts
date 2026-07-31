@@ -1,7 +1,7 @@
 import fsp from "node:fs/promises";
 import type { Stats } from "node:fs";
 import path from "node:path";
-import { glob, isDynamicPattern } from "tinyglobby";
+import { convertPathToPattern, glob, isDynamicPattern } from "tinyglobby";
 import { AutoEmbedError, ExitCode } from "../errors.js";
 
 const DEFAULT_IGNORES = [
@@ -44,8 +44,11 @@ export async function expandInputArgs(
         );
       }
       if (target.isFile()) matches = [direct];
-    } else if (isDynamicPattern(input)) {
-      matches = (await glob(input, globOptions(cwd))).filter((match) => !isIgnoredMatch(match));
+    } else if (isGlobPattern(input)) {
+      const target = globTarget(input, cwd);
+      matches = (await glob(target.pattern, globOptions(target.cwd))).filter(
+        (match) => !isIgnoredMatch(match),
+      );
     }
 
     if (matches.length === 0) {
@@ -60,6 +63,25 @@ export async function expandInputArgs(
   }
 
   return [...resolved].sort(comparePaths);
+}
+
+function globTarget(input: string, cwd: string): { cwd: string; pattern: string } {
+  const normalized = normalizeGlobPattern(input);
+  const segments = normalized.split("/");
+  const dynamicIndex = segments.findIndex((segment) => isDynamicPattern(segment));
+  const base = segments.slice(0, dynamicIndex).join("/") || ".";
+  return {
+    cwd: path.resolve(cwd, base),
+    pattern: segments.slice(dynamicIndex).join("/"),
+  };
+}
+
+function isGlobPattern(input: string): boolean {
+  return isDynamicPattern(normalizeGlobPattern(input));
+}
+
+function normalizeGlobPattern(input: string): string {
+  return process.platform === "win32" ? convertPathToPattern(input) : input;
 }
 
 async function expandDirectory(directory: string): Promise<string[]> {

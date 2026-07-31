@@ -43,7 +43,8 @@ describe("durable job state", () => {
     const firstPath = jobManifestPathFor(input, tmp);
     const secondPath = jobManifestPathFor({ ...input }, tmp);
     expect(firstPath).toBe(secondPath);
-    expect(firstPath).toMatch(/\.auto-embed\/jobs\/[a-f0-9]{64}\.job\.json$/);
+    expect(path.dirname(firstPath)).toBe(path.join(tmp, ".auto-embed", "jobs"));
+    expect(path.basename(firstPath)).toMatch(/^[a-f0-9]{64}\.job\.json$/);
 
     const manifest = await loadOrCreateJob(input, { baseDir: tmp });
     expect(manifest.completedChunkIds).toEqual([]);

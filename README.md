@@ -23,7 +23,7 @@ Sibling of [`auto-seed`](https://www.npmjs.com/package/auto-seed) — same opini
 - **Measured ingestion quality.** A private offline evaluator tracks Hit Rate, Recall@K, Precision@K, MRR, and nDCG without adding a public query API.
 - **Release evidence.** CI exercises Ubuntu, macOS, and Windows and checks the built CLI, circular dependencies, retrieval thresholds, package contents/size, and the 500 ms cold-start budget.
 
-The GitHub `v1.2.0` release contains these changes. npm remains on the prior published version until `v1.2.0` is intentionally published there.
+The GitHub `v1.2` release series contains these changes. npm remains on the prior published version until the v1.2 package is intentionally published there.
 
 ---
 

@@ -30,7 +30,7 @@ try {
   await writeFile(path.join(tmp, "docs", "nested", "b.txt"), "Second document.\n");
   await writeFile(path.join(tmp, "docs", "nested", "c.notes"), "Unknown text extension.\n");
 
-  assert.match(run(["--version"]).stdout, /^1\.2\.0/m);
+  assert.match(run(["--version"]).stdout, /^1\.2\.1/m);
   const help = run(["embed", "--help"]).stdout;
   for (const flag of [
     "--collection",
