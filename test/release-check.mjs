@@ -40,7 +40,11 @@ try {
     `cold start ${maxColdStartMs.toFixed(1)} ms exceeded 500 ms budget`,
   );
 
-  const packed = spawn(npm, ["pack", "--json", "--pack-destination", tmp]);
+  const packed = spawn(
+    npm,
+    ["pack", "--json", "--pack-destination", tmp],
+    { shell: process.platform === "win32" },
+  );
   const packInfo = JSON.parse(packed.stdout)[0];
   assert.ok(packInfo, "npm pack did not return package metadata");
   assert.ok(
