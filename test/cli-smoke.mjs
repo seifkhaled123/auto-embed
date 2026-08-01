@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cli = path.join(root, "dist", "index.js");
 const tmp = await mkdtemp(path.join(os.tmpdir(), "auto-embed-cli-"));
+const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 
 function run(args, expectedStatus = 0) {
   const result = spawnSync(process.execPath, [cli, ...args], {
@@ -30,7 +31,10 @@ try {
   await writeFile(path.join(tmp, "docs", "nested", "b.txt"), "Second document.\n");
   await writeFile(path.join(tmp, "docs", "nested", "c.notes"), "Unknown text extension.\n");
 
-  assert.match(run(["--version"]).stdout, /^1\.2\.1/m);
+  assert.equal(run(["--version"]).stdout.trim(), packageJson.version);
+  const rootHelp = run([]).stdout;
+  assert.match(rootHelp, /Usage: auto-embed/);
+  assert.match(rootHelp, /Zero-config CLI/);
   const help = run(["embed", "--help"]).stdout;
   for (const flag of [
     "--collection",
@@ -98,6 +102,10 @@ try {
   run(["embed", "docs/a.md", "--plan-only", "--out", "plan.json"]);
   const plan = JSON.parse(await readFile(path.join(tmp, "plan.json"), "utf8"));
   assert.equal(plan.version, 1);
+
+  run(["plan", "docs/a.md", "--out", "alias-plan.json"]);
+  const aliasPlan = JSON.parse(await readFile(path.join(tmp, "alias-plan.json"), "utf8"));
+  assert.equal(aliasPlan.version, 1);
 
   const conflict = run(["embed", "docs/a.md", "--dry-run", "--show-chunks"], 1);
   assert.match(conflict.stderr, /choose only one/i);

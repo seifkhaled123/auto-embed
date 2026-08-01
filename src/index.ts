@@ -6,8 +6,12 @@ import { buildConfigCommand } from "./commands/config.js";
 import { buildProvidersCommand } from "./commands/providers.js";
 import { isAutoEmbedError } from "./errors.js";
 import { log, setVerbose, isVerbose } from "./log.js";
+import {
+  runInteractiveApp,
+  shouldStartInteractive,
+} from "./interactive/app.js";
 
-const VERSION = "1.2.1";
+const VERSION = "1.2.3";
 
 function buildProgram(): Command {
   const program = new Command();
@@ -35,8 +39,15 @@ function buildProgram(): Command {
 
 async function main() {
   const program = buildProgram();
+  const args = process.argv.slice(2);
   try {
-    await program.parseAsync(process.argv);
+    if (shouldStartInteractive(args)) {
+      await runInteractiveApp();
+    } else if (args.length === 0) {
+      program.outputHelp();
+    } else {
+      await program.parseAsync(process.argv);
+    }
     // CLI: explicitly exit so background workers (onnxruntime-node thread
     // pool, fastembed cache, chroma child) don't keep the process alive.
     process.exit(0);

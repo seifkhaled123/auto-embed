@@ -42,6 +42,17 @@ auto-embed embed ./README.md --local
 
 ## Quick start
 
+For the guided experience, install the package and launch the persistent terminal menu:
+
+```bash
+npm i -g @seifkhaled/auto-embed
+auto-embed
+```
+
+The home screen puts the five primary actions up front: embed, preview, inspect chunks, create a plan, or export vectors. Browse files and folders or enter a path or glob such as `docs/**/*.md`; matches are shown before they are added. Missing provider or database configuration can be completed inline without losing the selected files. Choices apply to the current run unless you explicitly save them as defaults.
+
+Commands and flags remain available for scripts, CI, and AI agents:
+
 ```bash
 # Zero-key prototype: fastembed + Chroma, no setup needed
 npx @seifkhaled/auto-embed embed ./README.md --local
@@ -54,6 +65,8 @@ npx @seifkhaled/auto-embed embed ./docs --collection handbook
 ```
 
 The `init` flow asks you to pick an embedding provider, paste a key, pick a vector DB, and paste a connection. The config lives in `~/.auto-embed/config.json` with mode `0600` and is masked on display.
+
+Bare `auto-embed` opens prompts only when both input and output are attached to a terminal. In pipes and CI it prints help and exits instead of waiting for input.
 
 ---
 

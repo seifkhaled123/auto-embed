@@ -251,6 +251,17 @@ describe("resolvePlannerProvider", () => {
     expect(resolvePlannerProvider().provider).toBe("anthropic");
   });
 
+  it("uses a stored OpenAI or Google key when the environment is empty", () => {
+    expect(resolvePlannerProvider(process.env, {
+      apiKeys: { openai: "stored-openai-key" },
+    })).toEqual({ provider: "openai", apiKey: "stored-openai-key" });
+
+    process.env.AUTO_EMBED_PLAN_PROVIDER = "google";
+    expect(resolvePlannerProvider(process.env, {
+      apiKeys: { google: "stored-google-key" },
+    })).toEqual({ provider: "google", apiKey: "stored-google-key" });
+  });
+
   it("throws when no keys are present", () => {
     expect(() => resolvePlannerProvider()).toThrow(/No LLM provider key/);
   });

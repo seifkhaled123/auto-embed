@@ -2,6 +2,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import { AutoEmbedError, ExitCode } from "../errors.js";
+import type { Config } from "../config/schema.js";
 import { isRetryable } from "../providers/openai.js";
 import { EmbedPlan, EmbedPlanSchema, SplitterName } from "./schema.js";
 
@@ -285,13 +286,16 @@ async function safeFetch(name: string, url: string, init: RequestInit): Promise<
 
 // ---------- Provider/key resolution ----------
 
-export function resolvePlannerProvider(env: NodeJS.ProcessEnv = process.env): {
+export function resolvePlannerProvider(
+  env: NodeJS.ProcessEnv = process.env,
+  config?: Config,
+): {
   provider: PlannerProvider;
   apiKey: string;
 } {
   const explicit = (env.AUTO_EMBED_PLAN_PROVIDER as PlannerProvider | undefined) ?? null;
   if (explicit) {
-    const key = pickKey(explicit, env);
+    const key = pickKey(explicit, env) || configPlannerKey(explicit, config);
     if (!key) {
       throw new AutoEmbedError(
         `Planner provider "${explicit}" requested but its API key is not set.`,
@@ -305,6 +309,8 @@ export function resolvePlannerProvider(env: NodeJS.ProcessEnv = process.env): {
   if (env.ANTHROPIC_API_KEY) return { provider: "anthropic", apiKey: env.ANTHROPIC_API_KEY };
   if (env.OPENAI_API_KEY) return { provider: "openai", apiKey: env.OPENAI_API_KEY };
   if (env.GOOGLE_API_KEY) return { provider: "google", apiKey: env.GOOGLE_API_KEY };
+  if (config?.apiKeys?.openai) return { provider: "openai", apiKey: config.apiKeys.openai };
+  if (config?.apiKeys?.google) return { provider: "google", apiKey: config.apiKeys.google };
   throw new AutoEmbedError(
     "No LLM provider key found for --plan.",
     ExitCode.UserConfig,
@@ -321,6 +327,12 @@ function pickKey(provider: PlannerProvider, env: NodeJS.ProcessEnv): string {
     case "google":
       return env.GOOGLE_API_KEY ?? "";
   }
+}
+
+function configPlannerKey(provider: PlannerProvider, config?: Config): string {
+  if (provider === "openai") return config?.apiKeys?.openai ?? "";
+  if (provider === "google") return config?.apiKeys?.google ?? "";
+  return "";
 }
 
 function keyHint(provider: PlannerProvider): string {

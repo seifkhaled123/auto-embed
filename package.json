@@ -1,6 +1,6 @@
 {
   "name": "@seifkhaled/auto-embed",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Zero-config CLI that ingests files into vector databases for RAG projects. Parse, chunk, embed, upsert — one command.",
   "type": "module",
   "bin": {
