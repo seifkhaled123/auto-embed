@@ -11,6 +11,7 @@ import {
   DEFAULT_SEPARATORS,
   recursiveSplit,
 } from "../src/chunker/recursive.js";
+import { splitMarkdownSection } from "../src/chunker/markdown.js";
 import { parseFile } from "../src/parsers/index.js";
 import { heuristicPlan } from "../src/plan/heuristic.js";
 
@@ -33,7 +34,73 @@ describe("chunkId determinism", () => {
   });
 
   it("uses CHUNKER_VERSION in the hash", () => {
-    expect(CHUNKER_VERSION).toBe("2");
+    expect(CHUNKER_VERSION).toBe("3");
+  });
+});
+
+describe("splitMarkdownSection", () => {
+  const fakeTokens = (text: string) => text.length;
+
+  it("never cuts through a fenced JSON snippet", () => {
+    const json = [
+      "```json",
+      "{",
+      '  "name": "auto-embed",',
+      '  "features": ["parse", "chunk", "embed"]',
+      "}",
+      "```",
+    ].join("\n");
+    const text = `Intro paragraph with enough text to approach the boundary.\n\n${json}\n\nClosing notes after the snippet.`;
+    const chunks = splitMarkdownSection(text, {
+      chunkSize: 70,
+      overlap: 0,
+      countTokens: fakeTokens,
+    });
+
+    expect(chunks.filter((chunk) => chunk.includes(json))).toHaveLength(1);
+    expect(chunks.every((chunk) => {
+      const fences = chunk.match(/^```/gm)?.length ?? 0;
+      return fences === 0 || fences === 2;
+    })).toBe(true);
+  });
+
+  it("keeps an oversized fenced code snippet intact", () => {
+    const code = [
+      "~~~typescript",
+      "export function buildResult() {",
+      `  return "${"result ".repeat(20)}";`,
+      "}",
+      "~~~",
+    ].join("\n");
+    const chunks = splitMarkdownSection(`Before.\n\n${code}\n\nAfter.`, {
+      chunkSize: 40,
+      overlap: 0,
+      countTokens: fakeTokens,
+    });
+
+    expect(chunks.filter((chunk) => chunk.includes(code))).toHaveLength(1);
+    expect(chunks.find((chunk) => chunk.includes(code))!.length).toBeGreaterThan(40);
+  });
+
+  it("protects an unclosed fence through the end of the section", () => {
+    const unfinishedSource = [
+      "Prose before the example.",
+      "",
+      "```python",
+      "def greet(name):",
+      '    return f"Hello, {name}"',
+      "# the Markdown source itself forgot its closing fence",
+    ].join("\n");
+    const chunks = splitMarkdownSection(unfinishedSource, {
+      chunkSize: 35,
+      overlap: 0,
+      countTokens: fakeTokens,
+    });
+
+    expect(chunks.filter((chunk) => chunk.includes("```python"))).toHaveLength(1);
+    expect(chunks.find((chunk) => chunk.includes("```python"))).toContain(
+      "# the Markdown source itself forgot its closing fence",
+    );
   });
 });
 
