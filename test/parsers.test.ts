@@ -4,6 +4,7 @@ import path from "node:path";
 import url from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { parseFile } from "../src/parsers/index.js";
+import { splitMarkdownByHeaders } from "../src/parsers/markdown.js";
 import { parseCsvRows } from "../src/parsers/text.js";
 
 const here = path.dirname(url.fileURLToPath(import.meta.url));
@@ -127,6 +128,85 @@ describe("csv parser", () => {
 });
 
 describe("markdown parser", () => {
+  it("does not emit a separate chunkable section for a contentless parent heading", async () => {
+    const sections = await splitMarkdownByHeaders([
+      "# Guide",
+      "",
+      "## Quickstart",
+      "",
+      "### Configure",
+      "",
+      "Useful instructions.",
+    ].join("\n"));
+
+    expect(sections).toHaveLength(1);
+    expect(sections[0]!.meta.headerPath).toEqual(["Guide", "Quickstart", "Configure"]);
+  });
+
+  it("detects a webpage capture stored as .md and extracts embedded main content", async () => {
+    const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "auto-embed-web-capture-"));
+    const file = path.join(tmp, "captured.md");
+    const article = [
+      '<article class="readme">',
+      "<h1>Acme SDK</h1>",
+      "<p>The supported client for the Acme API, with enough useful article text to rank as primary content.</p>",
+      "<h2>Install</h2>",
+      "<ul><li>Install the package</li><li>Set the API key</li></ul>",
+      '<pre class="highlight-source-python"><code>client = Acme(\n    token=&quot;secret&quot;\n)</code></pre>',
+      "<table><tr><th>Option</th><th>Meaning</th></tr><tr><td>token</td><td>API token</td></tr></table>",
+      "</article>",
+    ].join("");
+    const capture = [
+      "<!DOCTYPE html>",
+      "<html><head><style>.shell { display: block }</style></head><body>",
+      "<nav>Repository navigation</nav>",
+      `<script type="application/json">${JSON.stringify({
+        featureFlags: ["alpha", "beta"],
+        applicationState: { rendered: article },
+      }).replace(/</g, "\\u003c").replace(/>/g, "\\u003e")}</script>`,
+      "<script>window.__HYDRATION__ = { token: 'do-not-index' }</script>",
+      "Application shell duplicate text",
+      "</body></html>",
+    ].join("\n");
+    await fsp.writeFile(file, capture);
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const doc = await parseFile(file);
+      expect(doc.contentType).toBe("html");
+      const all = doc.sections.map((section) => section.text).join("\n");
+      expect(all).toContain("# Acme SDK");
+      expect(all).toContain("## Install");
+      expect(all).toContain("- Install the package");
+      expect(all).toContain("```python");
+      expect(all).toContain('token="secret"');
+      expect(all).toContain("| Option | Meaning |");
+      expect(all).not.toMatch(/Repository navigation|featureFlags|HYDRATION|Application shell/);
+      expect(doc.sections.every((section) => section.meta.extractionOrigin === "embedded-json")).toBe(true);
+    } finally {
+      stderr.mockRestore();
+      await fsp.rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("removes frontmatter before deriving the header hierarchy", async () => {
+    const sections = await splitMarkdownByHeaders([
+      "> Documentation preamble",
+      "",
+      "---",
+      "id: page-123",
+      "---",
+      "",
+      "# Page title",
+      "",
+      "Useful content.",
+    ].join("\n"));
+
+    expect(sections).toHaveLength(1);
+    expect(sections[0]!.meta.headerPath).toEqual(["Page title"]);
+    expect(sections[0]!.text).toContain("> Documentation preamble");
+    expect(sections[0]!.text).not.toContain("id: page-123");
+  });
+
   it("splits sample.md into header-keyed sections", async () => {
     const doc = await parseFile(fx("sample.md"));
     expect(doc.contentType).toBe("markdown");

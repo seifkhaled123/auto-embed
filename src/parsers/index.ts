@@ -25,6 +25,28 @@ export const WHOLE_DOCUMENT_LIMIT_BYTES = 100 * 1024 * 1024;
  */
 export async function parseFile(sourcePath: string): Promise<ParsedDocument> {
   const ext = path.extname(sourcePath).toLowerCase();
+  const detected = await sniffContent(sourcePath);
+
+  // A full HTML document declaration and the PDF magic bytes are stronger
+  // evidence than a filename. This is intentionally conservative: ordinary
+  // Markdown containing an HTML fragment or a JSON example is not retyped.
+  if (detected === "pdf" && ext !== ".pdf") {
+    log.warn(`extension ${ext || "(none)"} disagrees with detected PDF content; using the PDF parser`);
+    const { parsePdf } = await import("./pdf.js");
+    return parsePdf(sourcePath);
+  }
+  if (detected === "html" && ext !== ".html" && ext !== ".htm") {
+    log.warn(`extension ${ext || "(none)"} disagrees with detected webpage content; extracting its main content`);
+    const { parseHtml } = await import("./html.js");
+    return parseHtml(sourcePath);
+  }
+  if (detected === "binary" && ext !== ".docx") {
+    throw new AutoEmbedError(
+      `Unsupported binary file: ${sourcePath}`,
+      ExitCode.Parser,
+      "Convert it to a supported text-bearing format before ingestion.",
+    );
+  }
 
   switch (ext) {
     case ".md":
@@ -78,25 +100,30 @@ export async function parseSource(sourcePath: string): Promise<ParsedSource> {
   const ext = path.extname(sourcePath).toLowerCase();
   const { sourceFromDocument } = await import("./stream.js");
 
-  if ([".txt", ".text", ".log"].includes(ext)) {
+  if ([".txt", ".text", ".log"].includes(ext) && await canStreamAsText(sourcePath)) {
     const { createTextStreamSource } = await import("./stream.js");
     return createTextStreamSource(sourcePath, "text");
   }
-  if (CODE_EXTENSIONS.has(ext)) {
+  if (CODE_EXTENSIONS.has(ext) && await canStreamAsText(sourcePath)) {
     const { createTextStreamSource } = await import("./stream.js");
     return createTextStreamSource(sourcePath, "code");
   }
-  if (ext === ".jsonl" || ext === ".ndjson") {
+  if ((ext === ".jsonl" || ext === ".ndjson") && await canStreamAsText(sourcePath)) {
     const { createJsonlStreamSource } = await import("./stream.js");
     return createJsonlStreamSource(sourcePath);
   }
-  if (ext === ".csv") {
+  if (ext === ".csv" && await canStreamAsText(sourcePath)) {
     const { createCsvStreamSource } = await import("./stream.js");
     return createCsvStreamSource(sourcePath);
   }
 
   await assertWholeDocumentLimit(sourcePath);
   return sourceFromDocument(await parseFile(sourcePath));
+}
+
+async function canStreamAsText(sourcePath: string): Promise<boolean> {
+  const detected = await sniffContent(sourcePath);
+  return detected !== "html" && detected !== "pdf" && detected !== "binary";
 }
 
 async function assertWholeDocumentLimit(sourcePath: string): Promise<void> {

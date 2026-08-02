@@ -34,55 +34,61 @@ describe("chunkId determinism", () => {
   });
 
   it("uses CHUNKER_VERSION in the hash", () => {
-    expect(CHUNKER_VERSION).toBe("3");
+    expect(CHUNKER_VERSION).toBe("4");
   });
 });
 
 describe("splitMarkdownSection", () => {
   const fakeTokens = (text: string) => text.length;
 
-  it("never cuts through a fenced JSON snippet", () => {
-    const json = [
-      "```json",
-      "{",
-      '  "name": "auto-embed",',
-      '  "features": ["parse", "chunk", "embed"]',
-      "}",
-      "```",
+  it("splits oversized indented JSON fences into valid, contextual JSON excerpts", async () => {
+    const values = Array.from({ length: 12 }, (_, index) => ({
+      name: `field-${index}`,
+      type: "text",
+      required: index % 2 === 0,
+    }));
+    const indentedJson = [
+      "    ```json expandable",
+      ...JSON.stringify(values, null, 2).split("\n").map((line) => `    ${line}`),
+      "    ```",
     ].join("\n");
-    const text = `Intro paragraph with enough text to approach the boundary.\n\n${json}\n\nClosing notes after the snippet.`;
-    const chunks = splitMarkdownSection(text, {
-      chunkSize: 70,
+    const text = `### v1\n\n${indentedJson}`;
+    const chunks = await splitMarkdownSection(text, {
+      chunkSize: 220,
       overlap: 0,
       countTokens: fakeTokens,
+      headerPath: ["Guide", "Fields", "v1"],
     });
 
-    expect(chunks.filter((chunk) => chunk.includes(json))).toHaveLength(1);
-    expect(chunks.every((chunk) => {
-      const fences = chunk.match(/^```/gm)?.length ?? 0;
-      return fences === 0 || fences === 2;
-    })).toBe(true);
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.every((chunk) => chunk.startsWith("# Guide\n\n## Fields\n\n### v1"))).toBe(true);
+    const jsonBodies = chunks.flatMap((chunk) =>
+      [...chunk.matchAll(/```json expandable\n([\s\S]*?)\n```/g)].map((match) => match[1]!),
+    );
+    expect(jsonBodies.length).toBeGreaterThan(1);
+    for (const body of jsonBodies) expect(() => JSON.parse(body)).not.toThrow();
+    expect(chunks.every((chunk) => (chunk.match(/^```/gm)?.length ?? 0) % 2 === 0)).toBe(true);
   });
 
-  it("keeps an oversized fenced code snippet intact", () => {
+  it("re-fences oversized code excerpts instead of emitting an oversized block", async () => {
     const code = [
       "~~~typescript",
-      "export function buildResult() {",
-      `  return "${"result ".repeat(20)}";`,
-      "}",
+      ...Array.from({ length: 18 }, (_, index) => `export const value${index} = ${index};`),
       "~~~",
     ].join("\n");
-    const chunks = splitMarkdownSection(`Before.\n\n${code}\n\nAfter.`, {
-      chunkSize: 40,
+    const chunks = await splitMarkdownSection(`Before.\n\n${code}\n\nAfter.`, {
+      chunkSize: 140,
       overlap: 0,
       countTokens: fakeTokens,
     });
 
-    expect(chunks.filter((chunk) => chunk.includes(code))).toHaveLength(1);
-    expect(chunks.find((chunk) => chunk.includes(code))!.length).toBeGreaterThan(40);
+    const excerpts = chunks.filter((chunk) => chunk.includes("Code excerpt (typescript)"));
+    expect(excerpts.length).toBeGreaterThan(1);
+    expect(excerpts.every((chunk) => (chunk.match(/^```/gm)?.length ?? 0) === 2)).toBe(true);
+    expect(chunks.every((chunk) => chunk.length <= 140)).toBe(true);
   });
 
-  it("protects an unclosed fence through the end of the section", () => {
+  it("closes and safely divides an unclosed source fence", async () => {
     const unfinishedSource = [
       "Prose before the example.",
       "",
@@ -91,16 +97,36 @@ describe("splitMarkdownSection", () => {
       '    return f"Hello, {name}"',
       "# the Markdown source itself forgot its closing fence",
     ].join("\n");
-    const chunks = splitMarkdownSection(unfinishedSource, {
-      chunkSize: 35,
+    const chunks = await splitMarkdownSection(unfinishedSource, {
+      chunkSize: 100,
       overlap: 0,
       countTokens: fakeTokens,
     });
 
-    expect(chunks.filter((chunk) => chunk.includes("```python"))).toHaveLength(1);
-    expect(chunks.find((chunk) => chunk.includes("```python"))).toContain(
-      "# the Markdown source itself forgot its closing fence",
-    );
+    const reconstructed = chunks
+      .flatMap((chunk) => [...chunk.matchAll(/```python\n([\s\S]*?)\n```/g)].map((match) => match[1]!))
+      .join(" ")
+      .replace(/\s+/g, " ");
+    expect(reconstructed).toContain("# the Markdown source itself forgot its closing fence");
+    expect(chunks.every((chunk) => (chunk.match(/^```/gm)?.length ?? 0) % 2 === 0)).toBe(true);
+  });
+
+  it("hard-splits a single enormous JSON scalar into bounded valid JSON excerpts", async () => {
+    const text = `\`\`\`json\n${JSON.stringify({ payload: "x".repeat(4_000) })}\n\`\`\``;
+    const chunks = await splitMarkdownSection(text, {
+      chunkSize: 180,
+      overlap: 0,
+      countTokens: fakeTokens,
+    });
+
+    expect(chunks.length).toBeGreaterThan(10);
+    expect(chunks.every((chunk) => chunk.length <= 180)).toBe(true);
+    expect(chunks.every((chunk) => chunk.includes("JSON excerpt:"))).toBe(true);
+    for (const chunk of chunks) {
+      const body = /```json\n([\s\S]*?)\n```/.exec(chunk)?.[1];
+      expect(body).toBeDefined();
+      expect(() => JSON.parse(body!)).not.toThrow();
+    }
   });
 });
 
@@ -263,5 +289,23 @@ describe("chunkDocument", () => {
       expect(chunk.meta.project).toBe("alpha");
       expect(chunk.meta.owner).toBe("ada");
     }
+  });
+
+  it("hard-limits a pathological single JSONL record", async () => {
+    const doc = {
+      sourcePath: "captured.jsonl",
+      contentType: "json" as const,
+      sections: [{ text: JSON.stringify({ payload: "x".repeat(1_000) }), meta: { line: 1 } }],
+    };
+    const plan = heuristicPlan({
+      sourcePath: doc.sourcePath,
+      embeddingModel: "text-embedding-3-small",
+      overrides: { chunkSize: 100, overlap: 0 },
+    });
+    const chunks = await chunkDocument(doc, plan);
+
+    expect(chunks.length).toBeGreaterThan(1);
+    await primeTokenizer();
+    expect(chunks.every((chunk) => countTokensSync(chunk.text) <= 100)).toBe(true);
   });
 });

@@ -234,7 +234,9 @@ auto-embed config path                            # absolute path to the config 
                               0 API calls.
 ```
 
-The chunker uses `js-tiktoken` for token counts and a port of LangChain's recursive splitter (no LangChain dependency). Each chunk gets a deterministic ID derived from `sha256(sourcePath + index + chunkerVersion + text)` — same input file + same plan + same model → byte-identical chunk IDs across machines.
+The parser checks high-confidence content signatures instead of trusting the extension alone. Webpage captures are reduced to their main article or README—even when that content is stored inside serialized application state—while navigation, styles, scripts, feature flags, and hydration data are discarded. Recovered HTML is normalized into structural Markdown before chunking, preserving headings, lists, tables, links, and code blocks.
+
+The chunker uses `js-tiktoken` for token counts and a port of LangChain's recursive splitter (no LangChain dependency). Markdown chunks retain their full header breadcrumb. Fenced and indented code blocks are detected from the Markdown syntax tree; oversized code is emitted as complete, language-tagged fenced excerpts, while valid JSON is divided into parseable values labeled with their JSON path. Structural blocks stay together when they fit, and a final hard guard bounds pathological single blocks or records. Each chunk gets a deterministic ID derived from `sha256(sourcePath + index + chunkerVersion + text)` — same input file + same plan + same model → byte-identical chunk IDs across machines.
 
 A per-file lockfile lives at `./.auto-embed/<hash>.lock.json`. The directory is ignored by default because it also contains temporary job/evaluation state. Teams that deliberately share idempotency state with CI can force-add only the stable `*.lock.json` files; do not commit incomplete job manifests or local evaluation output.
 

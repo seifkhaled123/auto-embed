@@ -11,7 +11,7 @@ import {
   shouldStartInteractive,
 } from "./interactive/app.js";
 
-const VERSION = "1.2.3";
+const VERSION = "1.2.4";
 
 function buildProgram(): Command {
   const program = new Command();

@@ -7,7 +7,7 @@ import { DEFAULT_SEPARATORS, recursiveSplit, TokenCounter } from "./recursive.js
 import { countTokensSync, primeTokenizer } from "./tokens.js";
 
 /** Bump on ANY chunker algorithm change. Invalidates all lockfiles. */
-export const CHUNKER_VERSION = "3";
+export const CHUNKER_VERSION = "4";
 
 export interface Chunk {
   id: string;
@@ -47,7 +47,7 @@ export async function* chunkSource(
   let chunkIndex = 0;
   for await (const section of source.sections()) {
     const document = documentShape(source);
-    const pieces = splitSection(section, document, plan, countTokens);
+    const pieces = await splitSection(section, document, plan, countTokens);
     let chunkInSection = 0;
     for (const text of pieces) {
       const chunk = createChunk(
@@ -83,7 +83,7 @@ async function* chunkStreamingText(
     buffer += section.text;
     if (buffer.length < flushAtChars) continue;
 
-    const pieces = splitStreamingBuffer(buffer, baseMeta, source, plan, countTokens);
+    const pieces = await splitStreamingBuffer(buffer, baseMeta, source, plan, countTokens);
     if (pieces.length < 2) continue;
     const carry = pieces.pop() ?? "";
     for (const piece of pieces) {
@@ -95,7 +95,7 @@ async function* chunkStreamingText(
     buffer = carry;
   }
 
-  for (const piece of splitStreamingBuffer(buffer, baseMeta, source, plan, countTokens)) {
+  for (const piece of await splitStreamingBuffer(buffer, baseMeta, source, plan, countTokens)) {
     const chunk = createChunk(source, plan, baseMeta, 0, chunkIndex, chunkIndex, piece);
     if (!chunk) continue;
     yield chunk;
@@ -103,13 +103,13 @@ async function* chunkStreamingText(
   }
 }
 
-function splitStreamingBuffer(
+async function splitStreamingBuffer(
   text: string,
   meta: Record<string, unknown>,
   source: ParsedSource,
   plan: EmbedPlan,
   countTokens: TokenCounter,
-): string[] {
+): Promise<string[]> {
   if (!text) return [];
   const effectivePlan = plan.splitter === "csv" || plan.splitter === "jsonl"
     ? { ...plan, splitter: "recursive" as const }
@@ -170,22 +170,49 @@ function documentShape(source: ParsedSource): ParsedDocument {
   };
 }
 
-function splitSection(
+async function splitSection(
   section: ParsedSection,
   document: ParsedDocument,
   plan: EmbedPlan,
   countTokens: TokenCounter,
-): string[] {
+): Promise<string[]> {
+  const pieces = await splitSectionSemantically(section, document, plan, countTokens);
+  return pieces.flatMap((piece) => enforceAtomicLimit(piece, plan.chunkSize, countTokens));
+}
+
+async function splitSectionSemantically(
+  section: ParsedSection,
+  _document: ParsedDocument,
+  plan: EmbedPlan,
+  countTokens: TokenCounter,
+): Promise<string[]> {
+  if (
+    section.meta.structuralFormat === "markdown" &&
+    (plan.splitter === "html" || plan.splitter === "markdown")
+  ) {
+    return splitMarkdownSection(section.text, {
+      chunkSize: plan.chunkSize,
+      overlap: plan.overlap,
+      countTokens,
+      headerPath: Array.isArray(section.meta.headerPath)
+        ? section.meta.headerPath.filter((header): header is string => typeof header === "string")
+        : [],
+    });
+  }
   switch (plan.splitter) {
     case "csv":
     case "jsonl":
-      // Parser already emitted one section per row / line — pass through.
+      // Parser already emitted one section per row / line. The outer hard
+      // guard still divides a pathological atomic record that exceeds the cap.
       return [section.text];
     case "markdown":
       return splitMarkdownSection(section.text, {
         chunkSize: plan.chunkSize,
         overlap: plan.overlap,
         countTokens,
+        headerPath: Array.isArray(section.meta.headerPath)
+          ? section.meta.headerPath.filter((header): header is string => typeof header === "string")
+          : [],
       });
     case "code": {
       const language = String(section.meta.language ?? "unknown");
@@ -198,6 +225,71 @@ function splitSection(
     default:
       return runRecursive(section.text, DEFAULT_SEPARATORS.recursive!, plan, countTokens);
   }
+}
+
+function enforceAtomicLimit(
+  text: string,
+  chunkSize: number,
+  countTokens: TokenCounter,
+): string[] {
+  if (countTokens(text) <= chunkSize) return [text];
+  const semanticFallback = recursiveSplit(text, {
+    // Stop at word boundaries here. If a single word/line is still too large,
+    // the code-point fallback below handles it without the recursive
+    // splitter's expensive character-by-character merge path.
+    separators: ["\n\n", "\n", ". ", " "],
+    chunkSize,
+    overlap: 0,
+    countTokens,
+  });
+  return semanticFallback.flatMap((piece) =>
+    countTokens(piece) <= chunkSize
+      ? [piece]
+      : splitByCodePointBudget(piece, chunkSize, countTokens),
+  );
+}
+
+function splitByCodePointBudget(
+  text: string,
+  chunkSize: number,
+  countTokens: TokenCounter,
+): string[] {
+  const characters = Array.from(text);
+  const out: string[] = [];
+  let start = 0;
+  const totalTokens = Math.max(1, countTokens(text));
+  const estimatedSpan = Math.max(
+    1,
+    Math.floor((characters.length / totalTokens) * chunkSize * 0.9),
+  );
+  while (start < characters.length) {
+    let best = Math.min(characters.length, start + estimatedSpan);
+    let low = start + 1;
+    let high = best;
+    if (countTokens(characters.slice(start, best).join("")) <= chunkSize) {
+      low = best + 1;
+      high = Math.min(characters.length, start + Math.ceil(estimatedSpan / 0.9));
+    } else {
+      best = start;
+    }
+    while (low <= high) {
+      const end = Math.floor((low + high) / 2);
+      const candidate = characters.slice(start, end).join("");
+      if (countTokens(candidate) <= chunkSize) {
+        best = end;
+        low = end + 1;
+      } else {
+        high = end - 1;
+      }
+    }
+    // A positive chunk size normally fits at least one code point. Retaining
+    // one indivisible point is the only non-corrupting fallback if it does not.
+    if (best === start) best = start + 1;
+    const fragment = characters.slice(start, best).join("").trim();
+    if (fragment) out.push(fragment);
+    start = best;
+  }
+  return out;
 }
 
 function runRecursive(
