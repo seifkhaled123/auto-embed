@@ -30,8 +30,16 @@ interface CodeBlock {
 
 interface MarkdownUnit {
   text: string;
-  kind: "prose" | "code";
+  kind: "prose" | "code" | "table";
   standalone: boolean;
+}
+
+interface TableBlock {
+  start: number;
+  end: number;
+  header: string;
+  delimiter: string;
+  rows: string[];
 }
 
 interface JsonFragment {
@@ -65,6 +73,7 @@ export async function splitMarkdownSection(
 function renderHeaderContext(headerPath: string[]): string {
   return headerPath
     .filter((header): header is string => typeof header === "string" && header.trim() !== "")
+    .filter((header, index, all) => index === 0 || header.trim() !== all[index - 1]!.trim())
     .map((header, index) => `${"#".repeat(Math.min(index + 1, 6))} ${header.trim()}`)
     .join("\n\n");
 }
@@ -103,6 +112,28 @@ async function markdownUnits(
 function proseUnits(text: string, budget: number, countTokens: TokenCounter): MarkdownUnit[] {
   const trimmed = text.trim();
   if (!trimmed) return [];
+  const tables = markdownTableBlocks(trimmed);
+  if (tables.length > 0) {
+    const units: MarkdownUnit[] = [];
+    let cursor = 0;
+    for (const table of tables) {
+      units.push(...plainProseUnits(trimmed.slice(cursor, table.start), budget, countTokens));
+      units.push(...tableUnits(table, budget, countTokens));
+      cursor = table.end;
+    }
+    units.push(...plainProseUnits(trimmed.slice(cursor), budget, countTokens));
+    return units;
+  }
+  return plainProseUnits(trimmed, budget, countTokens);
+}
+
+function plainProseUnits(
+  text: string,
+  budget: number,
+  countTokens: TokenCounter,
+): MarkdownUnit[] {
+  const trimmed = normalizeMdxContainers(text).trim();
+  if (!trimmed) return [];
   const inline = protectInlineCode(trimmed);
   const pieces = countTokens(trimmed) <= budget
     ? [inline.text]
@@ -117,6 +148,265 @@ function proseUnits(text: string, budget: number, countTokens: TokenCounter): Ma
     kind: "prose",
     standalone: false,
   }));
+}
+
+function normalizeMdxContainers(text: string): string {
+  const documentationContainers = new Set([
+    "Tabs",
+    "Tab",
+    "Steps",
+    "Step",
+    "Frame",
+    "CodeGroup",
+    "Expandable",
+    "Accordion",
+    "ComponentProps",
+    "Info",
+    "Warning",
+    "Note",
+    "Tip",
+    "Caution",
+    "Danger",
+  ]);
+  return text
+    .split(/\r?\n/)
+    .map((line) => {
+      if (/^[\t ]*#{1,6}[\t ]*$/.test(line)) return "";
+      const closing = /^[\t ]*<\/([A-Z][A-Za-z0-9.]*)>[\t ]*$/.exec(line);
+      if (closing) return documentationContainers.has(closing[1]!) ? "" : line;
+
+      const opening = /^[\t ]*<([A-Z][A-Za-z0-9.]*)([^>]*)>[\t ]*$/.exec(line);
+      if (!opening || /\/\s*>[\t ]*$/.test(line)) return line;
+      const [, component, attributes] = opening;
+      if (!documentationContainers.has(component!)) return line;
+      const title = mdxStringAttribute(attributes!, "title");
+      const componentName = mdxStringAttribute(attributes!, "componentName");
+
+      if (
+        component === "Tab" ||
+        component === "Step" ||
+        component === "Expandable" ||
+        component === "Accordion"
+      ) {
+        return title ? `#### ${title}` : "";
+      }
+      if (component === "ComponentProps") {
+        return componentName
+          ? `**Component properties for \`${componentName}\`:**`
+          : "**Component properties:**";
+      }
+      if (["Info", "Warning", "Note", "Tip", "Caution", "Danger"].includes(component!)) {
+        return `**${component}:**`;
+      }
+      return "";
+    })
+    .join("\n");
+}
+
+function mdxStringAttribute(attributes: string, name: string): string | null {
+  const match = new RegExp(`(?:^|\\s)${name}=(?:"([^"]*)"|'([^']*)')`).exec(attributes);
+  return match?.[1] ?? match?.[2] ?? null;
+}
+
+function markdownTableBlocks(text: string): TableBlock[] {
+  const lines = [...text.matchAll(/.*(?:\r?\n|$)/g)]
+    .filter((match) => match[0] !== "")
+    .map((match) => ({
+      start: match.index!,
+      end: match.index! + match[0].length,
+      text: match[0].replace(/\r?\n$/, ""),
+    }));
+  const blocks: TableBlock[] = [];
+
+  for (let index = 1; index < lines.length; index++) {
+    const header = lines[index - 1]!;
+    const delimiter = lines[index]!;
+    const headerCells = tableCells(header.text);
+    const delimiterCells = tableCells(delimiter.text);
+    if (
+      headerCells.length === 0 ||
+      headerCells.length !== delimiterCells.length ||
+      !delimiterCells.every((cell) => /^:?-{3,}:?$/.test(cell.trim()))
+    ) {
+      continue;
+    }
+
+    const rows: string[] = [];
+    let end = delimiter.end;
+    let cursor = index + 1;
+    while (cursor < lines.length) {
+      const row = lines[cursor]!;
+      if (tableCells(row.text).length !== headerCells.length) break;
+      rows.push(row.text);
+      end = row.end;
+      cursor++;
+    }
+    blocks.push({
+      start: header.start,
+      end,
+      header: renderTableCells(headerCells),
+      delimiter: renderTableCells(delimiterCells.map(normalizeTableDelimiter)),
+      rows: rows.map((row) => renderTableCells(tableCells(row))),
+    });
+    index = cursor - 1;
+  }
+  return blocks;
+}
+
+function renderTableCells(cells: string[]): string {
+  return `| ${cells.join(" | ")} |`;
+}
+
+function normalizeTableDelimiter(cell: string): string {
+  const value = cell.trim();
+  return `${value.startsWith(":") ? ":" : ""}---${value.endsWith(":") ? ":" : ""}`;
+}
+
+function tableCells(row: string): string[] {
+  let value = row.trim();
+  if (!value.includes("|")) return [];
+  if (value.startsWith("|")) value = value.slice(1);
+  if (value.endsWith("|") && !value.endsWith("\\|")) value = value.slice(0, -1);
+
+  const cells: string[] = [];
+  let cell = "";
+  for (let index = 0; index < value.length; index++) {
+    const character = value[index]!;
+    if (character === "|" && (index === 0 || value[index - 1] !== "\\")) {
+      cells.push(cell.trim());
+      cell = "";
+    } else {
+      cell += character;
+    }
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+function tableUnits(
+  table: TableBlock,
+  budget: number,
+  countTokens: TokenCounter,
+): MarkdownUnit[] {
+  const prefix = `${table.header}\n${table.delimiter}`;
+  const units: MarkdownUnit[] = [];
+  let rows: string[] = [];
+  const separatorTokens = countTokens("\n");
+  const prefixTokens = countTokens(prefix);
+  let estimatedTokens = prefixTokens;
+
+  const emitRows = (pending: string[]) => {
+    while (pending.length > 0) {
+      let take = pending.length;
+      let candidate = [prefix, ...pending.slice(0, take)].join("\n");
+      while (take > 1 && countTokens(candidate) > budget) {
+        take--;
+        candidate = [prefix, ...pending.slice(0, take)].join("\n");
+      }
+      if (countTokens(candidate) <= budget) {
+        units.push({ text: candidate, kind: "table", standalone: false });
+      } else {
+        units.push(...oversizedTableRowUnits(
+          table.header,
+          pending[0]!,
+          budget,
+          countTokens,
+        ));
+        take = 1;
+      }
+      pending = pending.slice(take);
+    }
+  };
+  const flush = () => {
+    if (rows.length === 0) return;
+    emitRows(rows);
+    rows = [];
+    estimatedTokens = prefixTokens;
+  };
+
+  for (const row of table.rows) {
+    const rowTokens = countTokens(row) + separatorTokens;
+    if (rows.length > 0 && estimatedTokens + rowTokens > budget) flush();
+    rows.push(row);
+    estimatedTokens += rowTokens;
+  }
+  flush();
+  if (units.length === 0) units.push({ text: prefix, kind: "table", standalone: false });
+  return units;
+}
+
+function oversizedTableRowUnits(
+  header: string,
+  row: string,
+  budget: number,
+  countTokens: TokenCounter,
+): MarkdownUnit[] {
+  const headers = tableCells(header);
+  const cells = tableCells(row);
+  const fields = headers.map((name, index) => `${name || `Column ${index + 1}`}: ${cells[index] ?? ""}`);
+  const units: MarkdownUnit[] = [];
+  let group: string[] = [];
+  const label = "Table row excerpt:\n\n";
+  const flush = () => {
+    if (group.length === 0) return;
+    units.push({ text: label + group.join("\n"), kind: "table", standalone: false });
+    group = [];
+  };
+
+  for (const field of fields) {
+    const candidate = label + [...group, field].join("\n");
+    if (countTokens(candidate) <= budget) {
+      group.push(field);
+      continue;
+    }
+    flush();
+    if (countTokens(label + field) <= budget) {
+      group.push(field);
+      continue;
+    }
+    const separator = field.indexOf(": ") + 2;
+    const fieldPrefix = `${label}${field.slice(0, separator)}`;
+    for (const piece of splitWithRepeatedPrefix(
+      field.slice(separator),
+      fieldPrefix,
+      budget,
+      countTokens,
+    )) {
+      units.push({ text: piece, kind: "table", standalone: false });
+    }
+  }
+  flush();
+  return units;
+}
+
+function splitWithRepeatedPrefix(
+  value: string,
+  prefix: string,
+  budget: number,
+  countTokens: TokenCounter,
+): string[] {
+  const characters = Array.from(value);
+  const pieces: string[] = [];
+  let start = 0;
+  while (start < characters.length) {
+    let low = start + 1;
+    let high = characters.length;
+    let best = start;
+    while (low <= high) {
+      const end = Math.floor((low + high) / 2);
+      const candidate = prefix + characters.slice(start, end).join("");
+      if (countTokens(candidate) <= budget) {
+        best = end;
+        low = end + 1;
+      } else {
+        high = end - 1;
+      }
+    }
+    if (best === start) best = start + 1;
+    pieces.push(prefix + characters.slice(start, best).join(""));
+    start = best;
+  }
+  return pieces;
 }
 
 function protectInlineCode(text: string): { text: string; restore: (text: string) => string } {
@@ -151,6 +441,7 @@ function protectInlineCode(text: string): { text: string; restore: (text: string
 }
 
 async function markdownCodeBlocks(text: string): Promise<CodeBlock[]> {
+  const fenced = fencedCodeBlocks(text);
   const tree = await parseMarkdownTree(text);
   const nodes: MarkdownNode[] = [];
   visitMarkdown(tree, (node) => {
@@ -165,6 +456,7 @@ async function markdownCodeBlocks(text: string): Promise<CodeBlock[]> {
     const start = text.lastIndexOf("\n", Math.max(0, startOffset - 1)) + 1;
     const nextNewline = text.indexOf("\n", endOffset);
     const end = nextNewline === -1 ? text.length : nextNewline + 1;
+    if (fenced.some((block) => start < block.end && end > block.start)) continue;
     const language = normalizeLanguage(node.lang ?? "text");
     const info = [node.lang, node.meta].filter(Boolean).join(" ") || language;
 
@@ -183,9 +475,79 @@ async function markdownCodeBlocks(text: string): Promise<CodeBlock[]> {
     }
   }
 
-  return blocks
+  return [...fenced, ...blocks]
     .sort((a, b) => a.start - b.start)
     .filter((block, index, all) => index === 0 || block.start >= all[index - 1]!.end);
+}
+
+/**
+ * CommonMark only permits up to three spaces before a fence, while MDX-style
+ * documentation often indents examples beneath components such as `<Tab>`.
+ * Scan fences lexically so those examples remain real, self-contained code
+ * blocks. The matching closer must use the same marker and at least the
+ * opener's length, which also protects longer fences containing backticks.
+ */
+function fencedCodeBlocks(text: string): CodeBlock[] {
+  const blocks: CodeBlock[] = [];
+  const lines = [...text.matchAll(/.*(?:\r?\n|$)/g)].filter((match) => match[0] !== "");
+  let open: {
+    start: number;
+    indent: string;
+    marker: string;
+    info: string;
+    content: string[];
+  } | null = null;
+
+  for (const lineMatch of lines) {
+    const rawWithNewline = lineMatch[0];
+    const raw = rawWithNewline.replace(/\r?\n$/, "");
+    if (!open) {
+      const opener = /^([\t ]*)(`{3,}|~{3,})([^\r\n]*)$/.exec(raw);
+      if (!opener) continue;
+      // Backtick fence info strings cannot themselves contain a backtick.
+      if (opener[2]![0] === "`" && opener[3]!.includes("`")) continue;
+      open = {
+        start: lineMatch.index!,
+        indent: opener[1]!,
+        marker: opener[2]!,
+        info: opener[3]!.trim(),
+        content: [],
+      };
+      continue;
+    }
+
+    const closer = /^[\t ]*(`+|~+)[\t ]*$/.exec(raw);
+    if (
+      closer &&
+      closer[1]![0] === open.marker[0] &&
+      closer[1]!.length >= open.marker.length
+    ) {
+      const language = normalizeLanguage(open.info.split(/\s+/, 1)[0] || "text");
+      blocks.push({
+        start: open.start,
+        end: lineMatch.index! + rawWithNewline.length,
+        language,
+        info: open.info || language,
+        content: open.content.join("\n"),
+      });
+      open = null;
+      continue;
+    }
+
+    open.content.push(raw.startsWith(open.indent) ? raw.slice(open.indent.length) : raw);
+  }
+
+  if (open) {
+    const language = normalizeLanguage(open.info.split(/\s+/, 1)[0] || "text");
+    blocks.push({
+      start: open.start,
+      end: text.length,
+      language,
+      info: open.info || language,
+      content: open.content.join("\n"),
+    });
+  }
+  return blocks;
 }
 
 let markdownTreeParser: Promise<(text: string) => MarkdownNode> | null = null;

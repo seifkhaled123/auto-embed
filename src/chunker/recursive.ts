@@ -114,7 +114,9 @@ function joinDocs(docs: string[], separator: string): string | null {
 
 export const DEFAULT_SEPARATORS: Record<string, string[]> = {
   recursive: ["\n\n", "\n", ". ", " ", ""],
-  markdown: ["\n## ", "\n### ", "\n#### ", "\n\n", "\n", ". ", " ", ""],
+  // Heading markers stay in the following fragment. Header-aware parsing has
+  // already split H1-H3 sections; blank/line boundaries preserve H4-H6.
+  markdown: ["\n\n", "\n", ". ", " ", ""],
   html: ["\n\n", "\n", ". ", " ", ""],
   // Code separators come from chunker/code.ts (language-tuned).
 };

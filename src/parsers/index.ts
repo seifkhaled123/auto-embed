@@ -1,7 +1,7 @@
 import fsp from "node:fs/promises";
-import path from "node:path";
 import { AutoEmbedError, ExitCode } from "../errors.js";
 import { log } from "../log.js";
+import { contentExtension } from "../util/extensions.js";
 import { ParsedDocument, ParsedSource } from "./types.js";
 
 const CODE_EXTENSIONS = new Set([
@@ -24,7 +24,7 @@ export const WHOLE_DOCUMENT_LIMIT_BYTES = 100 * 1024 * 1024;
  *
  */
 export async function parseFile(sourcePath: string): Promise<ParsedDocument> {
-  const ext = path.extname(sourcePath).toLowerCase();
+  const ext = contentExtension(sourcePath);
   const detected = await sniffContent(sourcePath);
 
   // A full HTML document declaration and the PDF magic bytes are stronger
@@ -97,7 +97,7 @@ export async function parseFile(sourcePath: string): Promise<ParsedDocument> {
 }
 
 export async function parseSource(sourcePath: string): Promise<ParsedSource> {
-  const ext = path.extname(sourcePath).toLowerCase();
+  const ext = contentExtension(sourcePath);
   const { sourceFromDocument } = await import("./stream.js");
 
   if ([".txt", ".text", ".log"].includes(ext) && await canStreamAsText(sourcePath)) {

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { contentExtension } from "../util/extensions.js";
 import { EmbedPlan, EmbedPlanSchema, SplitterName } from "./schema.js";
 
 interface HeuristicInput {
@@ -46,7 +47,7 @@ const CHUNK_SIZE_OVERRIDES: Partial<Record<SplitterName, number>> = {
 };
 
 export function heuristicPlan(input: HeuristicInput): EmbedPlan {
-  const ext = path.extname(input.sourcePath).toLowerCase();
+  const ext = contentExtension(input.sourcePath);
   const splitter: SplitterName =
     input.overrides?.splitter ?? EXT_TO_SPLITTER[ext] ?? "recursive";
   const chunkSize =

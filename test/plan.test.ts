@@ -35,6 +35,18 @@ describe("heuristicPlan", () => {
     );
   });
 
+  it("recovers supported extensions before numeric collision suffixes", () => {
+    expect(heuristicPlan({ sourcePath: "guide.md.14", embeddingModel: "m" }).splitter).toBe(
+      "markdown",
+    );
+    expect(heuristicPlan({ sourcePath: "events.jsonl.2", embeddingModel: "m" }).splitter).toBe(
+      "jsonl",
+    );
+    expect(heuristicPlan({ sourcePath: "release.2026", embeddingModel: "m" }).splitter).toBe(
+      "recursive",
+    );
+  });
+
   it("gives csv/jsonl a larger chunk-size cap (row-sized chunks)", () => {
     expect(heuristicPlan({ sourcePath: "x.csv", embeddingModel: "m" }).chunkSize).toBe(4096);
     expect(heuristicPlan({ sourcePath: "x.jsonl", embeddingModel: "m" }).chunkSize).toBe(

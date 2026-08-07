@@ -11,6 +11,19 @@ const here = path.dirname(url.fileURLToPath(import.meta.url));
 const fx = (name: string) => path.join(here, "fixtures", "parsers", name);
 
 describe("dispatcher", () => {
+  it("uses the supported extension before a numeric download suffix", async () => {
+    const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "auto-embed-suffixed-"));
+    const file = path.join(tmp, "guide.md.14");
+    await fsp.writeFile(file, "# Guide\n\n## Install\n\nRun the installer.\n");
+    try {
+      const doc = await parseFile(file);
+      expect(doc.contentType).toBe("markdown");
+      expect(doc.sections[0]!.meta.headerPath).toEqual(["Guide", "Install"]);
+    } finally {
+      await fsp.rm(tmp, { recursive: true, force: true });
+    }
+  });
+
   it("falls back to recursive text for an unknown text-like extension", async () => {
     const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "auto-embed-sniff-"));
     const file = path.join(tmp, "notes.xyz");
@@ -184,6 +197,26 @@ describe("markdown parser", () => {
       expect(doc.sections.every((section) => section.meta.extractionOrigin === "embedded-json")).toBe(true);
     } finally {
       stderr.mockRestore();
+      await fsp.rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("prefers a readable article over a larger page shell", async () => {
+    const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "auto-embed-article-"));
+    const file = path.join(tmp, "captured.html");
+    await fsp.writeFile(file, [
+      "<!doctype html><html><body>",
+      "<article><h1>Client guide</h1><p>Install and configure the supported API client for production use.</p><h2>Install</h2><p>Run the package installer, then configure credentials.</p></article>",
+      "<div><h2>About</h2><p>Repository sidebar</p><h3>Stars</h3><p>433 stars</p><h3>Watchers</h3><p>15 watching</p><h3>Forks</h3><p>126 forks</p></div>",
+      "</body></html>",
+    ].join(""));
+    try {
+      const doc = await parseFile(file);
+      const all = doc.sections.map((section) => section.text).join("\n");
+      expect(all).toContain("# Client guide");
+      expect(all).toContain("## Install");
+      expect(all).not.toMatch(/Repository sidebar|433 stars|15 watching|126 forks/);
+    } finally {
       await fsp.rm(tmp, { recursive: true, force: true });
     }
   });

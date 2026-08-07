@@ -34,7 +34,7 @@ describe("chunkId determinism", () => {
   });
 
   it("uses CHUNKER_VERSION in the hash", () => {
-    expect(CHUNKER_VERSION).toBe("4");
+    expect(CHUNKER_VERSION).toBe("5");
   });
 });
 
@@ -127,6 +127,91 @@ describe("splitMarkdownSection", () => {
       expect(body).toBeDefined();
       expect(() => JSON.parse(body!)).not.toThrow();
     }
+  });
+
+  it("recognizes fenced examples indented inside MDX components", async () => {
+    const text = [
+      "<Tabs>",
+      '  <Tab title="Example.tsx">',
+      "    ```tsx theme={null}",
+      '    import { Button } from "@acme/ui";',
+      "",
+      "    export const Example = () => <Button>Save</Button>;",
+      "    ```",
+      "  </Tab>",
+      "</Tabs>",
+    ].join("\n");
+    const chunks = await splitMarkdownSection(text, {
+      chunkSize: 1_000,
+      overlap: 0,
+      countTokens: fakeTokens,
+    });
+
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]).toContain("```tsx theme={null}");
+    expect(chunks[0]).toContain('import { Button } from "@acme/ui";');
+    expect(chunks[0]).toContain("#### Example.tsx");
+    expect(chunks[0]).not.toMatch(/<\/?Tabs?>/);
+    expect(chunks[0]).not.toContain("```text");
+    expect(chunks[0]!.match(/^```/gm)).toHaveLength(2);
+  });
+
+  it("repeats table headers when an oversized Markdown table is divided", async () => {
+    const header = "| Name | Description |";
+    const delimiter = "| -------------------- | ------------------------------ |";
+    const normalizedDelimiter = "| --- | --- |";
+    const rows = Array.from(
+      { length: 8 },
+      (_, index) => `| field_${index} | ${`description-${index} `.repeat(5)}|`,
+    );
+    const chunks = await splitMarkdownSection(
+      ["Table introduction.", "", header, delimiter, ...rows, "", "After the table."].join("\n"),
+      {
+        chunkSize: 180,
+        overlap: 0,
+        countTokens: fakeTokens,
+      },
+    );
+    const tableChunks = chunks.filter((chunk) => chunk.includes("| field_"));
+
+    expect(tableChunks.length).toBeGreaterThan(1);
+    expect(tableChunks.every((chunk) => chunk.includes(`${header}\n${normalizedDelimiter}`))).toBe(
+      true,
+    );
+    expect(chunks.every((chunk) => chunk.length <= 180)).toBe(true);
+  });
+
+  it("preserves deep heading markers across prose splits", async () => {
+    const text = [
+      "Introductory material. ".repeat(12),
+      "",
+      "#### Disconnect the app",
+      "",
+      "Disconnect the integration from the settings page. ".repeat(8),
+    ].join("\n");
+    const chunks = await splitMarkdownSection(text, {
+      chunkSize: 180,
+      overlap: 0,
+      countTokens: fakeTokens,
+    });
+
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.some((chunk) => chunk.includes("#### Disconnect the app"))).toBe(true);
+    expect(chunks.every((chunk) => chunk.length <= 180)).toBe(true);
+  });
+
+  it("removes empty heading markers and labels documentation callouts", async () => {
+    const chunks = await splitMarkdownSection(
+      ["<Warning>", "Keep the access token secret.", "</Warning>", "", "###"].join("\n"),
+      {
+        chunkSize: 180,
+        overlap: 0,
+        countTokens: fakeTokens,
+      },
+    );
+
+    expect(chunks.join("\n")).toContain("**Warning:**");
+    expect(chunks.join("\n")).not.toMatch(/<\/?Warning>|^###$/m);
   });
 });
 

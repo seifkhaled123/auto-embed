@@ -7,7 +7,7 @@ import { DEFAULT_SEPARATORS, recursiveSplit, TokenCounter } from "./recursive.js
 import { countTokensSync, primeTokenizer } from "./tokens.js";
 
 /** Bump on ANY chunker algorithm change. Invalidates all lockfiles. */
-export const CHUNKER_VERSION = "4";
+export const CHUNKER_VERSION = "5";
 
 export interface Chunk {
   id: string;

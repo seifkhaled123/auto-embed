@@ -196,22 +196,35 @@ function deduplicateCandidates(candidates: HtmlCandidate[]): HtmlCandidate[] {
 function selectPrimaryRoot(
   $: CheerioAPI,
 ): { root: Cheerio<AnyNode>; score: number } | null {
-  const roots: Array<Cheerio<AnyNode>> = [];
+  const articleRoots: Array<Cheerio<AnyNode>> = [];
+  const mainRoots: Array<Cheerio<AnyNode>> = [];
+  const fallbackRoots: Array<Cheerio<AnyNode>> = [];
   const seen = new Set<AnyNode>();
-  const add = (selection: Cheerio<AnyNode>) => {
+  const add = (target: Array<Cheerio<AnyNode>>, selection: Cheerio<AnyNode>) => {
     selection.each((_, node) => {
       if (seen.has(node)) return;
       seen.add(node);
-      roots.push($(node));
+      target.push($(node));
     });
   };
 
-  add($("article"));
-  add($("[role='main']"));
-  add($("main"));
-  add($("body"));
-  if (roots.length === 0) add($.root());
+  add(articleRoots, $("article"));
+  if (articleRoots.length === 1) {
+    const article = bestRoot(articleRoots);
+    if (article) return article;
+  }
+  add(mainRoots, $("[role='main']"));
+  add(mainRoots, $("main"));
+  add(fallbackRoots, $("body"));
+  if (fallbackRoots.length === 0) add(fallbackRoots, $.root());
 
+  // A readable semantic root is a stronger signal than a larger body. App
+  // shells and repository pages often surround the article with sidebars
+  // containing enough headings and links to outscore the real document.
+  return bestRoot(mainRoots) ?? bestRoot(articleRoots) ?? bestRoot(fallbackRoots);
+}
+
+function bestRoot(roots: Array<Cheerio<AnyNode>>): { root: Cheerio<AnyNode>; score: number } | null {
   let best: { root: Cheerio<AnyNode>; score: number } | null = null;
   for (const root of roots) {
     const score = scoreRoot(root);
